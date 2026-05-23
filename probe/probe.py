@@ -20,9 +20,12 @@ Outputs:
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import datetime
+
+import requests
 
 from introspect import run_introspection, parse_schema, print_schema_summary
 from scanner import scan_schema_for_sensitive_fields, print_scan_results
@@ -44,8 +47,13 @@ def parse_args():
     )
     parser.add_argument(
         "--target", "-t",
-        default="http://localhost:4000/graphql",
-        help="Target GraphQL endpoint URL (default: http://localhost:4000/graphql)",
+        default=os.getenv("GRAPHQL_TARGET", "http://localhost:4000/graphql"),
+        help=f"Target GraphQL endpoint URL (default: {os.getenv('GRAPHQL_TARGET', 'http://localhost:4000/graphql')})",
+    )
+    parser.add_argument(
+        "--dashboard-url",
+        default=os.getenv("DASHBOARD_REPORT_URL"),
+        help="Optional middleware dashboard report endpoint URL (e.g. http://localhost:8080/stats/report)",
     )
     parser.add_argument(
         "--batch-size", "-b",
@@ -71,6 +79,22 @@ def parse_args():
         help="Output file for JSON report (default: report.json)",
     )
     return parser.parse_args()
+
+
+def _derive_dashboard_url(target_url: str) -> str | None:
+    if "/graphql" in target_url:
+        return target_url.replace("/graphql", "/stats/report")
+    return None
+
+
+def _send_report_to_dashboard(report: dict, dashboard_url: str | None):
+    if not dashboard_url:
+        return
+    try:
+        response = requests.post(dashboard_url, json=report, timeout=10)
+        print(f"[+] Dashboard report sent to {dashboard_url} (status {response.status_code})")
+    except Exception as exc:
+        print(f"[!] Failed to send dashboard report to {dashboard_url}: {exc}")
 
 
 def run_probe(target_url: str, batch_size: int, depths: list, skip_dos: bool) -> dict:
@@ -231,6 +255,10 @@ def main():
     with open(args.output, "w") as f:
         json.dump(report, f, indent=2, default=str)
     print(f"\n[+] Full JSON report saved to: {args.output}")
+
+    dashboard_url = args.dashboard_url or _derive_dashboard_url(args.target)
+    if dashboard_url:
+        _send_report_to_dashboard(report, dashboard_url)
 
 
 if __name__ == "__main__":

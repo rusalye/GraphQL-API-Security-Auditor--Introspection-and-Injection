@@ -1,0 +1,241 @@
+{
+  "timestamp": "2026-05-23T13:25:26.763308",
+  "target": "http://localhost:8080/graphql",
+  "introspection": {
+    "disabled": true
+  },
+  "sensitive_fields": [],
+  "dos_attacks": {
+    "batching": {
+      "attack": "array_batching",
+      "batch_size": 100,
+      "status_code": 400,
+      "elapsed_seconds": 0.009,
+      "response_size_bytes": 217,
+      "vulnerable": false,
+      "blocked": true,
+      "message": "Server returned 400 \u2014 batch likely blocked"
+    },
+    "nesting": [
+      {
+        "attack": "deep_nesting",
+        "depth": 2,
+        "status_code": 502,
+        "elapsed_seconds": 0.03,
+        "response_size_bytes": 84,
+        "blocked": false,
+        "error": null
+      },
+      {
+        "attack": "deep_nesting",
+        "depth": 5,
+        "status_code": 400,
+        "elapsed_seconds": 0.022,
+        "response_size_bytes": 214,
+        "blocked": true,
+        "error": "Query depth 6 exceeds maximum allowed depth of 5"
+      },
+      {
+        "attack": "deep_nesting",
+        "depth": 10,
+        "status_code": 400,
+        "elapsed_seconds": 0.006,
+        "response_size_bytes": 216,
+        "blocked": true,
+        "error": "Query depth 11 exceeds maximum allowed depth of 5"
+      },
+      {
+        "attack": "deep_nesting",
+        "depth": 20,
+        "status_code": 400,
+        "elapsed_seconds": 0.007,
+        "response_size_bytes": 216,
+        "blocked": true,
+        "error": "Query depth 21 exceeds maximum allowed depth of 5"
+      },
+      {
+        "attack": "deep_nesting",
+        "depth": 50,
+        "status_code": 400,
+        "elapsed_seconds": 0.006,
+        "response_size_bytes": 216,
+        "blocked": true,
+        "error": "Query depth 51 exceeds maximum allowed depth of 5"
+      }
+    ]
+  },
+  "injection": [
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "SQLi_always_true",
+      "payload_value": "' OR '1'='1",
+      "baseline_size": 86,
+      "injected_size": 271,
+      "size_delta": 185,
+      "time_delta": -0.007,
+      "indicators": [
+        "response size changed by 185 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"' OR '1'='1\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "SQLi_comment_bypass",
+      "payload_value": "' OR 1=1 --",
+      "baseline_size": 86,
+      "injected_size": 268,
+      "size_delta": 182,
+      "time_delta": -0.007,
+      "indicators": [
+        "response size changed by 182 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"' OR 1=1 --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "SQLi_union_probe",
+      "payload_value": "' UNION SELECT 1,2,3 --",
+      "baseline_size": 86,
+      "injected_size": 258,
+      "size_delta": 172,
+      "time_delta": -0.007,
+      "indicators": [
+        "response size changed by 172 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"' UNION SELECT 1,2,3 --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "SQLi_sleep_mysql",
+      "payload_value": "' OR SLEEP(3) --",
+      "baseline_size": 86,
+      "injected_size": 248,
+      "size_delta": 162,
+      "time_delta": -0.007,
+      "indicators": [
+        "response size changed by 162 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"' OR SLEEP(3) --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "SQLi_sleep_postgres",
+      "payload_value": "' OR pg_sleep(3) --",
+      "baseline_size": 86,
+      "injected_size": 248,
+      "size_delta": 162,
+      "time_delta": -0.007,
+      "indicators": [
+        "response size changed by 162 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"' OR pg_sleep(3) --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "SQLi_drop_probe",
+      "payload_value": "'; DROP TABLE users; --",
+      "baseline_size": 86,
+      "injected_size": 266,
+      "size_delta": 180,
+      "time_delta": -0.007,
+      "indicators": [
+        "response size changed by 180 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"'; DROP TABLE users; --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "SQLi_stacked",
+      "payload_value": "1'; SELECT 1 --",
+      "baseline_size": 86,
+      "injected_size": 86,
+      "size_delta": 0,
+      "time_delta": 0.001,
+      "indicators": [],
+      "vulnerable": false,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"1'; SELECT 1 --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "NoSQLi_gt_operator",
+      "payload_value": "{\"$gt\": \"\"}",
+      "baseline_size": 86,
+      "injected_size": 287,
+      "size_delta": 201,
+      "time_delta": 0.002,
+      "indicators": [
+        "response size changed by 201 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$gt\\\": \\\"\\\"}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "NoSQLi_ne_operator",
+      "payload_value": "{\"$ne\": null}",
+      "baseline_size": 86,
+      "injected_size": 287,
+      "size_delta": 201,
+      "time_delta": -0.004,
+      "indicators": [
+        "response size changed by 201 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$ne\\\": null}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "NoSQLi_where_clause",
+      "payload_value": "{\"$where\": \"sleep(3000)\"}",
+      "baseline_size": 86,
+      "injected_size": 248,
+      "size_delta": 162,
+      "time_delta": -0.003,
+      "indicators": [
+        "response size changed by 162 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$where\\\": \\\"sleep(3000)\\\"}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    },
+    {
+      "query": "search_users",
+      "argument": "query",
+      "payload_name": "NoSQLi_regex",
+      "payload_value": "{\"$regex\": \".*\"}",
+      "baseline_size": 86,
+      "injected_size": 290,
+      "size_delta": 204,
+      "time_delta": -0.004,
+      "indicators": [
+        "response size changed by 204 bytes"
+      ],
+      "vulnerable": true,
+      "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$regex\\\": \\\".*\\\"}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
+    }
+  ],
+  "summary": {
+    "introspection_exposed": false,
+    "high_sensitivity_fields": 0,
+    "total_sensitive_fields": 0,
+    "batching_vulnerable": false,
+    "nesting_vulnerable": true,
+    "injection_vulnerable": true,
+    "overall_risk": "HIGH"
+  }
+}

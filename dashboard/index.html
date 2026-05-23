@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GraphQL Security Demo Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1323;
+      --surface: #111a35;
+      --surface-2: #14254b;
+      --text: #e7edf8;
+      --muted: #9bb0d4;
+      --accent: #5fc3fc;
+      --success: #5dd39e;
+      --danger: #ff6b6b;
+      --warning: #f0b429;
+      --border: rgba(255,255,255,0.08);
+      --shadow: 0 18px 60px rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top, rgba(95,195,252,.12), transparent 24%),
+                  linear-gradient(180deg, #08101f 0%, #070b14 53%, #090d17 100%);
+    }
+    .page {
+      width: min(1300px, calc(100% - 3rem));
+      margin: 0 auto;
+      padding: 2rem 0 4rem;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: clamp(2.2rem, 3vw, 3.2rem); letter-spacing: -0.04em; }
+    h2 { font-size: 1.1rem; color: var(--muted); margin-top: .35rem; }
+    .hero { display: grid; gap: 1.2rem; justify-items: stretch; }
+    .hero-row { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 1.25rem; box-shadow: var(--shadow); }
+    .overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+    .stat-card { border-radius: 18px; border: 1px solid var(--border); padding: 1rem 1.25rem; background: rgba(11,19,35,.92); }
+    .stat-card strong { display: block; font-size: 2.2rem; margin-bottom: 0.35rem; }
+    .stat-label { color: var(--muted); font-size: .9rem; }
+    .chip { display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .75rem; border-radius: 999px; font-size: .82rem; background: rgba(95,195,252,.12); color: var(--accent); border: 1px solid rgba(95,195,252,.2); }
+    .badge { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .75rem; border-radius: 999px; font-size: .8rem; margin: .25rem .25rem 0 0; }
+    .badge-green { background: rgba(93,211,158,.14); color: var(--success); border: 1px solid rgba(93,211,158,.25); }
+    .badge-red { background: rgba(255,107,107,.12); color: var(--danger); border: 1px solid rgba(255,107,107,.25); }
+    .badge-yellow { background: rgba(240,180,41,.12); color: var(--warning); border: 1px solid rgba(240,180,41,.25); }
+    .grid-2 { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+    .grid-3 { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .alert { border-radius: 18px; padding: 1rem 1.25rem; display: grid; gap: .45rem; background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.24); }
+    .alert strong { color: #ffb3b3; }
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; margin: 0; }
+    th, td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,.06); }
+    th { color: var(--accent); font-size: .85rem; letter-spacing: .02em; text-transform: uppercase; }
+    td { color: var(--text); font-size: .92rem; }
+    code { background: rgba(255,255,255,.06); padding: .25rem .4rem; border-radius: 6px; color: #d2ddec; }
+    .mini-chart { width: 8rem; height: 10px; display: grid; grid-template-columns: repeat(6, 1fr); gap: .25rem; }
+    .bar { background: rgba(95,195,252,.35); border-radius: 999px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-top: 1rem; }
+    .toolbar form { display: grid; grid-template-columns: 1fr auto; gap: .65rem; width: min(100%, 34rem); }
+    input, button, select { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); color: var(--text); border-radius: 14px; padding: .85rem 1rem; font-size: .95rem; }
+    button { cursor: pointer; transition: transform .12s ease, background .12s ease; }
+    button:hover { transform: translateY(-1px); background: rgba(95,195,252,.16); }
+    .footer { color: var(--muted); font-size: .9rem; margin-top: 1rem; }
+    .alert-line { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: center; }
+    .sparkline { width: 100%; height: 60px; background: rgba(255,255,255,.03); border-radius: 18px; padding: 1rem; display: grid; align-items: end; gap: .33rem; }
+    .sparkline span { display: block; border-radius: 999px; background: linear-gradient(180deg, #5fc3fc, #3e8fdb); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="hero-row">
+      <div>
+        <h1>GraphQL Security Demo Dashboard</h1>
+        <h2>Live attack alerts, protection metrics, and demo-ready story view.</h2>
+      </div>
+      <div class="chip" id="statusChip">Loading status...</div>
+    </div>
+
+    <div class="panel">
+      <div class="toolbar">
+        <form id="targetForm">
+          <label for="apiEndpoint">Stats API endpoint</label>
+          <input id="apiEndpoint" name="apiEndpoint" type="url" value="http://localhost:8080/stats" placeholder="https://host:8080/stats" />
+          <button type="submit">Connect</button>
+        </form>
+        <div style="display: flex; gap: .75rem; flex-wrap: wrap; align-items: center;">
+          <button id="refreshBtn">Refresh Now</button>
+          <button id="demoResetBtn">Reset Alerts</button>
+        </div>
+      </div>
+      <div class="overview" id="metricsGrid">
+        <div class="stat-card"><strong id="metricTotal">0</strong><div class="stat-label">Total requests</div></div>
+        <div class="stat-card"><strong id="metricBlocked">0</strong><div class="stat-label">Blocked requests</div></div>
+        <div class="stat-card"><strong id="metricForwarded">0</strong><div class="stat-label">Forwarded requests</div></div>
+        <div class="stat-card"><strong id="metricRate">0%</strong><div class="stat-label">Block rate</div></div>
+      </div>
+      <div id="alertBanner"></div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 1rem;">
+      <div class="panel">
+        <h3>Attack Overview</h3>
+        <p style="color: var(--muted);">This dashboard pulls live enforcement metrics from the middleware and highlights the latest blocked attacks.</p>
+        <div class="grid-3" id="miniStats">
+          <div class="stat-card"><strong id="miniRuleCount">0</strong><div class="stat-label">Unique rules blocked</div></div>
+          <div class="stat-card"><strong id="miniIpCount">0</strong><div class="stat-label">Blocked source IPs</div></div>
+          <div class="stat-card"><strong id="miniRecentCount">0</strong><div class="stat-label">Recent blocks</div></div>
+        </div>
+        <div class="sparkline" id="sparkline"></div>
+      </div>
+      <div class="panel">
+        <h3>Live Demo Controls</h3>
+        <p style="color: var(--muted);">Use this section while demonstrating how the middleware blocks attacks in real time.</p>
+        <div>
+          <div class="badge badge-green">Safe mode</div>
+          <div class="badge badge-red">Attack mode</div>
+        </div>
+        <div style="margin-top: 1rem;" id="demoMessage">Waiting for data...</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 1rem;">
+      <div class="panel table-wrap">
+        <h3>Blocks by Rule</h3>
+        <table>
+          <thead><tr><th>Rule</th><th>Count</th></tr></thead>
+          <tbody id="rulesTable"><tr><td colspan="2" style="color: var(--muted);">No blocks yet</td></tr></tbody>
+        </table>
+      </div>
+      <div class="panel table-wrap">
+        <h3>Top Attack Sources</h3>
+        <table>
+          <thead><tr><th>IP</th><th>Blocked</th></tr></thead>
+          <tbody id="ipTable"><tr><td colspan="2" style="color: var(--muted);">No sources yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel table-wrap" style="margin-top: 1rem;">
+      <h3>Latest Probe Report</h3>
+      <div id="probeSummary"><p style="color: var(--muted);">No probe report received yet.</p></div>
+    </div>
+
+    <div class="panel table-wrap" style="margin-top: 1rem;">
+      <h3>Recent Blocked Requests</h3>
+      <table>
+        <thead><tr><th>Time</th><th>Rule</th><th>IP</th><th>Reason</th><th>Query Preview</th></tr></thead>
+        <tbody id="recentTable"><tr><td colspan="5" style="color: var(--muted);">No blocked requests recorded yet.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel" style="margin-top: 1rem; display: grid; gap: 1rem;">
+      <h3>Demo Narrative</h3>
+      <ol style="color: var(--muted); padding-left: 1.25rem;">
+        <li>Send a malicious GraphQL request through the middleware.</li>
+        <li>Watch the blocked count increment live.</li>
+        <li>Show the rule that stopped the attack and the badge alerts.</li>
+        <li>Use <code>/stats</code> to confirm JSON metrics and <code>/stats/dashboard</code> for quick viewing.</li>
+      </ol>
+      <p style="font-size:.95rem; color: #b8c5e4;">Tip: Use the browser DevTools network tab to show the middleware request and response details while the dashboard updates.</p>
+    </div>
+
+    <div class="footer">Built as a standalone demo dashboard. Use a browser to open this file or serve it with a local static server.</div>
+  </div>
+
+  <script>
+    const apiInput = document.getElementById('apiEndpoint');
+    const statusChip = document.getElementById('statusChip');
+    const alertBanner = document.getElementById('alertBanner');
+    const metricTotal = document.getElementById('metricTotal');
+    const metricBlocked = document.getElementById('metricBlocked');
+    const metricForwarded = document.getElementById('metricForwarded');
+    const metricRate = document.getElementById('metricRate');
+    const miniRuleCount = document.getElementById('miniRuleCount');
+    const miniIpCount = document.getElementById('miniIpCount');
+    const miniRecentCount = document.getElementById('miniRecentCount');
+    const rulesTable = document.getElementById('rulesTable');
+    const ipTable = document.getElementById('ipTable');
+    const probeSummary = document.getElementById('probeSummary');
+    const recentTable = document.getElementById('recentTable');
+    const sparkline = document.getElementById('sparkline');
+    const demoMessage = document.getElementById('demoMessage');
+    const targetForm = document.getElementById('targetForm');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const demoResetBtn = document.getElementById('demoResetBtn');
+
+    let currentEndpoint = apiInput.value.trim();
+    let history = [];
+
+    function formatTime(ts) {
+      let dt;
+      if (typeof ts === 'number') {
+        dt = new Date(ts);
+      } else {
+        dt = new Date(ts);
+        if (Number.isNaN(dt.getTime())) {
+          dt = new Date(ts.replace(' ', 'T') + 'Z');
+        }
+      }
+      return Number.isNaN(dt.getTime()) ? String(ts) : dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function renderProbeReport(report) {
+      if (!report) {
+        probeSummary.innerHTML = '<p style="color: var(--muted);">No probe report received yet.</p>';
+        return;
+      }
+
+      const details = [
+        `<div><strong>Target:</strong> <code>${report.target || 'unknown'}</code></div>`,
+        `<div><strong>Time:</strong> ${formatTime(report.timestamp_ms || report.timestamp)}</div>`,
+        `<div><strong>Risk:</strong> <code>${report.summary?.overall_risk || 'N/A'}</code></div>`,
+        `<div><strong>Introspection exposed:</strong> ${report.introspection_exposed ? '<span class="badge badge-red">YES</span>' : '<span class="badge badge-green">NO</span>'}</div>`,
+        `<div><strong>Batching vuln:</strong> ${report.batching_vulnerable ? '<span class="badge badge-red">YES</span>' : '<span class="badge badge-green">NO</span>'}</div>`,
+        `<div><strong>Nesting vuln:</strong> ${report.nesting_vulnerable ? '<span class="badge badge-red">YES</span>' : '<span class="badge badge-green">NO</span>'}</div>`,
+        `<div><strong>Injection vuln:</strong> ${report.injection_vulnerable ? '<span class="badge badge-red">YES</span>' : '<span class="badge badge-green">NO</span>'}</div>`,
+      ];
+
+      probeSummary.innerHTML = details.map(item => `<div style="margin-bottom:.55rem;">${item}</div>`).join('');
+    }
+
+    function renderBlocks(data) {
+      metricTotal.textContent = data.total_requests;
+      metricBlocked.textContent = data.blocked_requests;
+      metricForwarded.textContent = data.forwarded_requests;
+      metricRate.textContent = data.block_rate_percent + '%';
+      miniRuleCount.textContent = Object.keys(data.blocks_by_rule).length;
+      miniIpCount.textContent = Object.keys(data.blocks_by_ip).length;
+      miniRecentCount.textContent = data.recent_blocks.length;
+
+      const ruleRows = Object.entries(data.blocks_by_rule).sort((a,b)=>b[1]-a[1]).map(([rule,count]) => 
+        `<tr><td><code>${rule}</code></td><td>${count}</td></tr>`).join('') || '<tr><td colspan="2" style="color: var(--muted);">No blocks yet</td></tr>';
+      rulesTable.innerHTML = ruleRows;
+
+      const ipRows = Object.entries(data.blocks_by_ip).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([ip,count]) =>
+        `<tr><td>${ip}</td><td>${count}</td></tr>`).join('') || '<tr><td colspan="2" style="color: var(--muted);">No sources yet</td></tr>';
+      ipTable.innerHTML = ipRows;
+
+      if (data.recent_blocks.length === 0) {
+        recentTable.innerHTML = '<tr><td colspan="5" style="color: var(--muted);">No blocked requests recorded yet.</td></tr>';
+      } else {
+        recentTable.innerHTML = data.recent_blocks.map(block =>
+          `<tr><td>${formatTime(block.timestamp_ms || block.timestamp)}</td><td><code>${block.rule_id}</code></td><td>${block.client_ip}</td><td>${block.reason}</td><td><code>${block.query_preview}</code></td></tr>`
+        ).join('');
+      }
+
+      const values = data.recent_blocks.slice(0, 12).map(b => Math.min(12, b.reason.length));
+      const max = Math.max(5, ...values);
+      sparkline.innerHTML = values.map(value => `<span class="bar" style="height:${(value/max)*100}%"></span>`).join('');
+
+      const active = data.block_rate_percent > 0 || data.blocked_requests > 0;
+      statusChip.textContent = active ? 'ACTIVE DEFENSE' : 'IDLE';
+      statusChip.className = active ? 'chip' : 'chip';
+      statusChip.style.background = active ? 'rgba(93,211,158,.14)' : 'rgba(255,255,255,.04)';
+      statusChip.style.color = active ? 'var(--success)' : 'var(--muted)';
+
+      if (data.blocked_requests > 0) {
+        alertBanner.innerHTML = `
+          <div class="alert">
+            <div class="alert-line"><strong>Attack alert!</strong><span>${data.blocked_requests} blocked request(s) detected — the middleware is protecting the GraphQL API.</span></div>
+            <div>Top blocked rule: <code>${Object.entries(data.blocks_by_rule).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'n/a'}</code></div>
+          </div>`;
+      } else {
+        alertBanner.innerHTML = '<div class="alert" style="background: rgba(95,195,252,.12); border-color: rgba(95,195,252,.24);"><strong>No attacks yet.</strong> The middleware is standing by and ready to block suspicious GraphQL payloads.</div>';
+      }
+
+      if (data.block_rate_percent > 20) {
+        demoMessage.innerHTML = '<div class="badge badge-red">High block rate detected — show this as the strongest live protection event.</div>';
+      } else if (data.block_rate_percent > 5) {
+        demoMessage.innerHTML = '<div class="badge badge-yellow">Moderate attack activity — explain how the middleware is filtering threats.</div>';
+      } else {
+        demoMessage.innerHTML = '<div class="badge badge-green">Normal traffic or no attacks — use this phase to discuss attack patterns and rules.</div>';
+      }
+      renderProbeReport(data.latest_probe_report);
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch(currentEndpoint, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const data = await res.json();
+        renderBlocks(data);
+      } catch (error) {
+        alertBanner.innerHTML = `<div class="alert"><strong>Unable to load stats</strong><span>${error.message}</span></div>`;
+      }
+    }
+
+    targetForm.addEventListener('submit', event => {
+      event.preventDefault();
+      currentEndpoint = apiInput.value.trim();
+      loadStats();
+    });
+
+    refreshBtn.addEventListener('click', () => loadStats());
+    demoResetBtn.addEventListener('click', () => {
+      history = [];
+      alertBanner.innerHTML = '<div class="alert" style="background: rgba(95,195,252,.12); border-color: rgba(95,195,252,.24);"><strong>Demo reset.</strong> The dashboard will refresh with fresh metrics.</div>';
+    });
+
+    setInterval(loadStats, 4000);
+    loadStats();
+  </script>
+</body>
+</html>

@@ -60,6 +60,7 @@ stats = {
     "blocks_by_rule": defaultdict(int),
     "blocks_by_ip": defaultdict(int),
     "recent_blocks": [],        # last 20 blocked requests
+    "recent_probe_reports": [],  # last 5 probe reports
     "start_time": datetime.now().isoformat(),
 }
 
@@ -71,6 +72,7 @@ def record_block(rule_id: str, reason: str, client_ip: str, query_preview: str):
     
     entry = {
         "timestamp": datetime.now().isoformat(),
+        "timestamp_ms": int(time.time() * 1000),
         "rule_id": rule_id,
         "reason": reason,
         "client_ip": client_ip,
@@ -233,7 +235,29 @@ def get_stats():
         "blocks_by_rule": dict(stats["blocks_by_rule"]),
         "blocks_by_ip": dict(stats["blocks_by_ip"]),
         "recent_blocks": stats["recent_blocks"],
+        "latest_probe_report": stats["recent_probe_reports"][0] if stats["recent_probe_reports"] else None,
+        "recent_probe_reports": stats["recent_probe_reports"],
     }
+
+
+@app.post("/stats/report")
+async def receive_probe_report(request: Request):
+    payload = await request.json()
+    report_entry = {
+        "timestamp": payload.get("timestamp") or datetime.now().isoformat(),
+        "timestamp_ms": int(time.time() * 1000),
+        "target": payload.get("target"),
+        "summary": payload.get("summary", {}),
+        "introspection_exposed": payload.get("summary", {}).get("introspection_exposed"),
+        "high_sensitivity_fields": payload.get("summary", {}).get("high_sensitivity_fields"),
+        "batching_vulnerable": payload.get("summary", {}).get("batching_vulnerable"),
+        "nesting_vulnerable": payload.get("summary", {}).get("nesting_vulnerable"),
+        "injection_vulnerable": payload.get("summary", {}).get("injection_vulnerable"),
+    }
+    stats["recent_probe_reports"].insert(0, report_entry)
+    stats["recent_probe_reports"] = stats["recent_probe_reports"][:5]
+    print(f"[MIDDLEWARE] Received probe report for {report_entry['target']} at {report_entry['timestamp']}")
+    return {"status": "ok", "stored_reports": len(stats["recent_probe_reports"]) }
 
 
 @app.get("/stats/dashboard", response_class=HTMLResponse)
