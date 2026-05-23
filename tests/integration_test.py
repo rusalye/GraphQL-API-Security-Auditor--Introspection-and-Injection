@@ -146,7 +146,7 @@ def test_deep_nesting(url: str, expect_vulnerable: bool):
 def test_injection(url: str, expect_vulnerable: bool):
     subheader("Test 5: SQL Injection")
     # Classic always-true SQLi
-    query = '{ search_users(query: "\\' OR 1=1 --") { count users { id username password } } }'
+    query = "{ search_users(query: \"' OR 1=1 --\") { count users { id username password } } }"
     status, body = post(url, {"query": query})
     
     vulnerable = False

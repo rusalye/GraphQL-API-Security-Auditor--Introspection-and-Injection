@@ -13,6 +13,7 @@ Vulnerabilities baked in:
 
 import strawberry
 from strawberry.fastapi import GraphQLRouter
+from strawberry.schema.config import StrawberryConfig
 from fastapi import FastAPI
 from typing import Optional, List
 import uvicorn
@@ -141,8 +142,16 @@ class NestedUser:
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
 
+# Disable automatic GraphQL camelCase conversion so field names stay snake_case.
+# This keeps the API behavior consistent with the probe and integration tests.
+strawberry.auto_camel_case = False
+
 schema = strawberry.Schema(
     query=Query,
+    config=StrawberryConfig(
+        auto_camel_case=False,
+        batching_config={"max_operations": 100},
+    ),
     # introspection_rules=[] means introspection is ON by default — VULNERABLE
 )
 
