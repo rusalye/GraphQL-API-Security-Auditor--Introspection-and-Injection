@@ -1,3 +1,5 @@
 strawberry-graphql[fastapi]
 fastapi
 uvicorn
+pymongo
+motor

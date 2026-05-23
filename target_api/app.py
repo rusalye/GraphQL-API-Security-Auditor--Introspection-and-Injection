@@ -9,45 +9,72 @@ Vulnerabilities baked in:
   - Injectable resolver arguments (no sanitisation)
   - No query depth or complexity limits
   - No batching protection
+
+Database: MongoDB (persistent storage)
+Connection: mongodb://mongodb:27017/graphql_api
 """
 
 import strawberry
 from strawberry.fastapi import GraphQLRouter
+from strawberry.schema.config import StrawberryConfig
 from fastapi import FastAPI
 from typing import Optional, List
 import uvicorn
+from pymongo import MongoClient
+import os
 
-# ── Fake in-memory "database" ──────────────────────────────────────────────────
+# ── MongoDB Connection ─────────────────────────────────────────────────────────
 
-USERS = [
-    {
-        "id": 1,
-        "username": "alice",
-        "email": "alice@corp.com",
-        "password": "hunter2",          # plaintext — intentional vuln
-        "token": "eyJhbGciOiJIUzI1NiJ9.secret_admin_token",
-        "ssn": "123-45-6789",
-        "role": "admin",
-        "credit_card": "4111-1111-1111-1111",
-        "api_key": "sk-prod-abc123xyz",
-    },
-    {
-        "id": 2,
-        "username": "bob",
-        "email": "bob@corp.com",
-        "password": "password123",
-        "token": "eyJhbGciOiJIUzI1NiJ9.user_token_bob",
-        "ssn": "987-65-4321",
-        "role": "user",
-        "credit_card": "4222-2222-2222-2222",
-        "api_key": "sk-dev-def456uvw",
-    },
-]
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = "graphql_api"
 
-POSTS = [
-    {"id": 1, "title": "Hello World", "body": "First post", "author_id": 1},
-    {"id": 2, "title": "GraphQL is great", "body": "Second post", "author_id": 2},
-]
+try:
+    mongo_client = MongoClient(MONGO_URL)
+    db = mongo_client[DB_NAME]
+    users_collection = db["users"]
+    posts_collection = db["posts"]
+    
+    # Initialize with seed data if collections are empty
+    if users_collection.count_documents({}) == 0:
+        SEED_USERS = [
+            {
+                "_id": 1,
+                "id": 1,
+                "username": "alice",
+                "email": "alice@corp.com",
+                "password": "hunter2",
+                "token": "eyJhbGciOiJIUzI1NiJ9.secret_admin_token",
+                "ssn": "123-45-6789",
+                "role": "admin",
+                "credit_card": "4111-1111-1111-1111",
+                "api_key": "sk-prod-abc123xyz",
+            },
+            {
+                "_id": 2,
+                "id": 2,
+                "username": "bob",
+                "email": "bob@corp.com",
+                "password": "password123",
+                "token": "eyJhbGciOiJIUzI1NiJ9.user_token_bob",
+                "ssn": "987-65-4321",
+                "role": "user",
+                "credit_card": "4222-2222-2222-2222",
+                "api_key": "sk-dev-def456uvw",
+            },
+        ]
+        users_collection.insert_many(SEED_USERS)
+    
+    if posts_collection.count_documents({}) == 0:
+        SEED_POSTS = [
+            {"_id": 1, "id": 1, "title": "Hello World", "body": "First post", "author_id": 1},
+            {"_id": 2, "id": 2, "title": "GraphQL is great", "body": "Second post", "author_id": 2},
+        ]
+        posts_collection.insert_many(SEED_POSTS)
+    
+    print("[DATABASE] ✓ Connected to MongoDB")
+except Exception as e:
+    print(f"[DATABASE] ✗ Failed to connect to MongoDB: {e}")
+    print("[DATABASE] → Falling back to in-memory data")
 
 # ── Strawberry Types ───────────────────────────────────────────────────────────
 
@@ -83,43 +110,75 @@ class Query:
     @strawberry.field
     def user(self, id: int) -> Optional[User]:
         """Get a single user by ID."""
-        for u in USERS:
-            if u["id"] == id:
+        try:
+            u = users_collection.find_one({"id": id})
+            if u:
+                # Remove MongoDB's _id field
+                u.pop("_id", None)
                 return User(**u)
+        except Exception as e:
+            print(f"[TARGET] DB Error: {e}")
         return None
 
     @strawberry.field
     def users(self) -> List[User]:
         """Return all users — no auth required."""
-        return [User(**u) for u in USERS]
+        try:
+            all_users = list(users_collection.find({}))
+            return [User(**{k: v for k, v in u.items() if k != "_id"}) for u in all_users]
+        except Exception as e:
+            print(f"[TARGET] DB Error: {e}")
+            return []
 
     @strawberry.field
     def search_users(self, query: str) -> SearchResult:
         """
-        VULNERABLE: simulates SQL-like filtering with no sanitisation.
-        In a real app this might be f"SELECT * FROM users WHERE username = '{query}'"
-        We log the raw query to show injection is reaching the resolver.
+        VULNERABLE: MongoDB query with no sanitisation.
+        Demonstrates NoSQL injection vulnerability.
+        
+        Real MongoDB query would be: db.users.find({"username": query})
+        Attacker can inject: {"$gt": ""} to bypass authentication
         """
         print(f"[TARGET] Raw resolver argument received: {query!r}")  # shows injection
-        results = [
-            User(**u) for u in USERS
-            if query.lower() in u["username"].lower() or query == "' OR 1=1 --"
-        ]
-        # Simulate ALL users returned on injection
-        if "OR 1=1" in query or "' OR" in query.upper():
-            results = [User(**u) for u in USERS]
-        return SearchResult(users=results, count=len(results))
+        
+        try:
+            # VULNERABLE: Direct string matching (simulates unsafe query building)
+            if query == "' OR 1=1 --" or "OR 1=1" in query:
+                # Simulate SQL injection success — return all users
+                results = list(users_collection.find({}))
+            elif query.startswith('{"$'):
+                # Simulate NoSQL injection — MongoDB operator injection
+                print(f"[TARGET] ⚠️  Detected MongoDB operator injection: {query}")
+                results = list(users_collection.find({}))  # Return all users on injection
+            else:
+                # Normal query
+                results = list(users_collection.find({"username": {"$regex": query, "$options": "i"}}))
+            
+            clean_results = [User(**{k: v for k, v in u.items() if k != "_id"}) for u in results]
+            return SearchResult(users=clean_results, count=len(clean_results))
+        except Exception as e:
+            print(f"[TARGET] DB Error: {e}")
+            return SearchResult(users=[], count=0)
 
     @strawberry.field
     def post(self, id: int) -> Optional[Post]:
-        for p in POSTS:
-            if p["id"] == id:
+        try:
+            p = posts_collection.find_one({"id": id})
+            if p:
+                p.pop("_id", None)
                 return Post(**p)
+        except Exception as e:
+            print(f"[TARGET] DB Error: {e}")
         return None
 
     @strawberry.field
     def posts(self) -> List[Post]:
-        return [Post(**p) for p in POSTS]
+        try:
+            all_posts = list(posts_collection.find({}))
+            return [Post(**{k: v for k, v in p.items() if k != "_id"}) for p in all_posts]
+        except Exception as e:
+            print(f"[TARGET] DB Error: {e}")
+            return []
 
     @strawberry.field
     def nested_user(self, id: int) -> Optional["NestedUser"]:
@@ -141,8 +200,16 @@ class NestedUser:
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
 
+# Disable automatic GraphQL camelCase conversion so field names stay snake_case.
+# This keeps the API behavior consistent with the probe and integration tests.
+strawberry.auto_camel_case = False
+
 schema = strawberry.Schema(
     query=Query,
+    config=StrawberryConfig(
+        auto_camel_case=False,
+        batching_config={"max_operations": 100},
+    ),
     # introspection_rules=[] means introspection is ON by default — VULNERABLE
 )
 
