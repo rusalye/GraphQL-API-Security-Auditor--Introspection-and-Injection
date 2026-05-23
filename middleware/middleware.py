@@ -681,15 +681,30 @@ DASHBOARD_HTML = """
         }
 
         /* --- Dashboard Polling Logic --- */
+        let lastStats = null;
+        let lastVulnStats = null;
+
+        function updateTopCards() {
+            if (!lastStats) return;
+            let bypasses = 0;
+            if (lastVulnStats) {
+                bypasses = Math.max(0, lastVulnStats.total_requests - lastStats.forwarded_requests);
+            }
+            const realTotal = lastStats.total_requests + bypasses;
+            
+            document.getElementById('val-total').textContent = realTotal;
+            document.getElementById('val-blocked').textContent = lastStats.blocked_requests;
+            document.getElementById('val-forwarded').textContent = lastStats.forwarded_requests;
+            
+            const rate = realTotal > 0 ? Math.round((lastStats.blocked_requests / realTotal) * 100) : 0;
+            document.getElementById('val-rate').textContent = rate;
+        }
         async function fetchStats() {
             try {
                 const response = await fetch('/stats');
                 const data = await response.json();
-                
-                document.getElementById('val-total').textContent = data.total_requests;
-                document.getElementById('val-blocked').textContent = data.blocked_requests;
-                document.getElementById('val-forwarded').textContent = data.forwarded_requests;
-                document.getElementById('val-rate').textContent = data.block_rate_percent;
+                lastStats = data;
+                updateTopCards();
 
                 const feedTbody = document.getElementById('feed-tbody');
                 feedTbody.innerHTML = '';
@@ -733,6 +748,8 @@ DASHBOARD_HTML = """
             try {
                 const response = await fetch('http://localhost:4000/vuln_stats');
                 const data = await response.json();
+                lastVulnStats = data;
+                updateTopCards();
                 
                 const feedTbody = document.getElementById('vuln-feed-tbody');
                 feedTbody.innerHTML = '';
@@ -752,6 +769,9 @@ DASHBOARD_HTML = """
                         const tdQuery = document.createElement('td');
                         const codeQuery = document.createElement('code');
                         codeQuery.textContent = b.query_preview;
+                        if (b.query_preview.includes('alice')) {
+                            codeQuery.style.color = 'var(--accent-green)';
+                        }
                         tdQuery.appendChild(codeQuery);
 
                         tr.appendChild(tdTime);
