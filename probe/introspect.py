@@ -123,19 +123,27 @@ def run_introspection(target_url: str, timeout: int = 10) -> dict:
             headers={"Content-Type": "application/json"},
             timeout=timeout,
         )
-        response.raise_for_status()
+        
+        # Read body BEFORE raise_for_status so we can inspect middleware blocks.
+        # Middleware returns 400 with {"blocked": true} — that is NOT a connection
+        # failure, it means the security layer is working correctly.
         data = response.json()
         
         if "errors" in data:
             errors = data["errors"]
-            # Check if introspection is disabled
-            for err in errors:
-                msg = err.get("message", "").lower()
-                if "introspection" in msg or "disabled" in msg:
-                    print("[INTROSPECT] ✗ INTROSPECTION IS DISABLED — server is hardened")
-                    return {"introspection_disabled": True, "errors": errors}
+            # Check if introspection is disabled (middleware block or server-side)
+            if data.get("blocked") or any(
+                "introspection" in err.get("message", "").lower()
+                or "disabled" in err.get("message", "").lower()
+                for err in errors
+            ):
+                print("[INTROSPECT] ✗ INTROSPECTION IS DISABLED — server is hardened")
+                return {"introspection_disabled": True, "errors": errors}
             print(f"[INTROSPECT] ✗ GraphQL errors: {errors}")
             return {"errors": errors}
+        
+        # Only raise for non-GraphQL HTTP errors (e.g. 500, 502)
+        response.raise_for_status()
         
         print("[INTROSPECT] ✓ Introspection SUCCESSFUL — server is VULNERABLE")
         return data.get("data", {})
