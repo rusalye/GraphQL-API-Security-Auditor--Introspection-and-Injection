@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  # Vulnerable Target API — runs on port 4000
+  target-api:
+    build:
+      context: ./target_api
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    networks:
+      - graphql-net
+    restart: unless-stopped
+
+  # Security Middleware — runs on port 8080
+  middleware:
+    build:
+      context: ./middleware
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - TARGET_GRAPHQL_URL=http://target-api:4000/graphql
+    depends_on:
+      - target-api
+    networks:
+      - graphql-net
+    restart: unless-stopped
+
+networks:
+  graphql-net:
+    driver: bridge
