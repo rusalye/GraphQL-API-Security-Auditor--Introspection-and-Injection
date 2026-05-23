@@ -623,7 +623,7 @@ DASHBOARD_HTML = """
             <p style="font-size:0.75rem; color:var(--text-muted); margin:0 0 10px 0;">Queries that successfully reached the backend.</p>
             <table>
                 <thead>
-                    <tr><th>Time</th><th>Client IP</th><th>Query Preview</th></tr>
+                    <tr><th>Time</th><th>Client IP</th><th>Type</th><th>Query Preview</th></tr>
                 </thead>
                 <tbody id="vuln-feed-tbody">
                 </tbody>
@@ -744,6 +744,15 @@ DASHBOARD_HTML = """
             }
         }
         
+        function guessAttackType(query) {
+            if (query.includes('__schema')) return { name: 'Schema Introspection', color: 'red' };
+            if (query.includes('BATCH:')) return { name: 'DoS: Array Batching', color: 'red' };
+            if (query.includes('nested_user')) return { name: 'DoS: Deep Nesting', color: 'red' };
+            if (query.includes('OR 1=1') || query.includes('$ne') || query.includes('SLEEP')) return { name: 'Injection Attack', color: 'red' };
+            if (query.includes('alice')) return { name: 'Legitimate Query', color: 'green' };
+            return { name: 'Unknown', color: 'gray' };
+        }
+
         async function fetchVulnStats() {
             try {
                 const response = await fetch('http://localhost:4000/vuln_stats');
@@ -754,7 +763,7 @@ DASHBOARD_HTML = """
                 const feedTbody = document.getElementById('vuln-feed-tbody');
                 feedTbody.innerHTML = '';
                 if (data.recent_requests.length === 0) {
-                    feedTbody.innerHTML = '<tr><td colspan="3" class="empty-state">No requests received</td></tr>';
+                    feedTbody.innerHTML = '<tr><td colspan="4" class="empty-state">No requests received</td></tr>';
                 } else {
                     data.recent_requests.forEach(b => {
                         const tr = document.createElement('tr');
@@ -766,6 +775,20 @@ DASHBOARD_HTML = """
                         const tdIp = document.createElement('td');
                         tdIp.textContent = b.client_ip;
                         
+                        const tdType = document.createElement('td');
+                        const attackInfo = guessAttackType(b.query_preview);
+                        const spanTag = document.createElement('span');
+                        spanTag.className = 'attack-tag';
+                        spanTag.textContent = attackInfo.name;
+                        if (attackInfo.color === 'green') {
+                            spanTag.style.background = 'rgba(63, 185, 80, 0.2)';
+                            spanTag.style.color = '#7ee787';
+                        } else if (attackInfo.color === 'gray') {
+                            spanTag.style.background = 'rgba(139, 148, 158, 0.2)';
+                            spanTag.style.color = '#8b949e';
+                        }
+                        tdType.appendChild(spanTag);
+                        
                         const tdQuery = document.createElement('td');
                         const codeQuery = document.createElement('code');
                         codeQuery.textContent = b.query_preview;
@@ -776,6 +799,7 @@ DASHBOARD_HTML = """
 
                         tr.appendChild(tdTime);
                         tr.appendChild(tdIp);
+                        tr.appendChild(tdType);
                         tr.appendChild(tdQuery);
                         feedTbody.appendChild(tr);
                     });
