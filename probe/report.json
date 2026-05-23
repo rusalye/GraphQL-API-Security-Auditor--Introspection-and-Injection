@@ -1,461 +1,66 @@
 {
-  "timestamp": "2026-05-23T11:46:39.726522",
-  "target": "http://localhost:4000/graphql",
+  "timestamp": "2026-05-23T15:31:02.725014",
+  "target": "http://localhost:8080/graphql",
   "introspection": {
-    "disabled": false,
-    "schema": {
-      "query_type": "Query",
-      "mutation_type": null,
-      "query_fields": [
-        {
-          "name": "user",
-          "description": null,
-          "args": [
-            {
-              "name": "id",
-              "type": "Int!"
-            }
-          ],
-          "type": "User",
-          "deprecated": false
-        },
-        {
-          "name": "users",
-          "description": null,
-          "args": [],
-          "type": "[User!]!",
-          "deprecated": false
-        },
-        {
-          "name": "search_users",
-          "description": null,
-          "args": [
-            {
-              "name": "query",
-              "type": "String!"
-            }
-          ],
-          "type": "SearchResult!",
-          "deprecated": false
-        },
-        {
-          "name": "post",
-          "description": null,
-          "args": [
-            {
-              "name": "id",
-              "type": "Int!"
-            }
-          ],
-          "type": "Post",
-          "deprecated": false
-        },
-        {
-          "name": "posts",
-          "description": null,
-          "args": [],
-          "type": "[Post!]!",
-          "deprecated": false
-        },
-        {
-          "name": "nested_user",
-          "description": null,
-          "args": [
-            {
-              "name": "id",
-              "type": "Int!"
-            }
-          ],
-          "type": "NestedUser",
-          "deprecated": false
-        }
-      ],
-      "mutation_fields": [],
-      "all_types": {
-        "Query": {
-          "kind": "OBJECT",
-          "fields": [
-            {
-              "name": "user",
-              "description": null,
-              "args": [
-                {
-                  "name": "id",
-                  "type": "Int!"
-                }
-              ],
-              "type": "User",
-              "deprecated": false
-            },
-            {
-              "name": "users",
-              "description": null,
-              "args": [],
-              "type": "[User!]!",
-              "deprecated": false
-            },
-            {
-              "name": "search_users",
-              "description": null,
-              "args": [
-                {
-                  "name": "query",
-                  "type": "String!"
-                }
-              ],
-              "type": "SearchResult!",
-              "deprecated": false
-            },
-            {
-              "name": "post",
-              "description": null,
-              "args": [
-                {
-                  "name": "id",
-                  "type": "Int!"
-                }
-              ],
-              "type": "Post",
-              "deprecated": false
-            },
-            {
-              "name": "posts",
-              "description": null,
-              "args": [],
-              "type": "[Post!]!",
-              "deprecated": false
-            },
-            {
-              "name": "nested_user",
-              "description": null,
-              "args": [
-                {
-                  "name": "id",
-                  "type": "Int!"
-                }
-              ],
-              "type": "NestedUser",
-              "deprecated": false
-            }
-          ]
-        },
-        "User": {
-          "kind": "OBJECT",
-          "fields": [
-            {
-              "name": "id",
-              "description": null,
-              "args": [],
-              "type": "Int!",
-              "deprecated": false
-            },
-            {
-              "name": "username",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "email",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "password",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "token",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "ssn",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "role",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "credit_card",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "api_key",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            }
-          ]
-        },
-        "SearchResult": {
-          "kind": "OBJECT",
-          "fields": [
-            {
-              "name": "users",
-              "description": null,
-              "args": [],
-              "type": "[User!]!",
-              "deprecated": false
-            },
-            {
-              "name": "count",
-              "description": null,
-              "args": [],
-              "type": "Int!",
-              "deprecated": false
-            }
-          ]
-        },
-        "Post": {
-          "kind": "OBJECT",
-          "fields": [
-            {
-              "name": "id",
-              "description": null,
-              "args": [],
-              "type": "Int!",
-              "deprecated": false
-            },
-            {
-              "name": "title",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "body",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "author_id",
-              "description": null,
-              "args": [],
-              "type": "Int!",
-              "deprecated": false
-            }
-          ]
-        },
-        "NestedUser": {
-          "kind": "OBJECT",
-          "fields": [
-            {
-              "name": "id",
-              "description": null,
-              "args": [],
-              "type": "Int!",
-              "deprecated": false
-            },
-            {
-              "name": "username",
-              "description": null,
-              "args": [],
-              "type": "String!",
-              "deprecated": false
-            },
-            {
-              "name": "friend",
-              "description": null,
-              "args": [],
-              "type": "NestedUser",
-              "deprecated": false
-            }
-          ]
-        }
-      }
-    },
-    "query_count": 6,
-    "type_count": 5
+    "disabled": true
   },
-  "sensitive_fields": [
-    {
-      "type_name": "User",
-      "field_name": "password",
-      "field_type": "String!",
-      "severity": "HIGH",
-      "matched_term": "password",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    password\n  }\n}"
-    },
-    {
-      "type_name": "User",
-      "field_name": "token",
-      "field_type": "String!",
-      "severity": "HIGH",
-      "matched_term": "token",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    token\n  }\n}"
-    },
-    {
-      "type_name": "User",
-      "field_name": "ssn",
-      "field_type": "String!",
-      "severity": "HIGH",
-      "matched_term": "ssn",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    ssn\n  }\n}"
-    },
-    {
-      "type_name": "User",
-      "field_name": "credit_card",
-      "field_type": "String!",
-      "severity": "HIGH",
-      "matched_term": "credit_card",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    credit_card\n  }\n}"
-    },
-    {
-      "type_name": "User",
-      "field_name": "api_key",
-      "field_type": "String!",
-      "severity": "HIGH",
-      "matched_term": "api_key",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    api_key\n  }\n}"
-    },
-    {
-      "type_name": "User",
-      "field_name": "email",
-      "field_type": "String!",
-      "severity": "MEDIUM",
-      "matched_term": "email",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    email\n  }\n}"
-    },
-    {
-      "type_name": "User",
-      "field_name": "role",
-      "field_type": "String!",
-      "severity": "MEDIUM",
-      "matched_term": "role",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    role\n  }\n}"
-    },
-    {
-      "type_name": "User",
-      "field_name": "username",
-      "field_type": "String!",
-      "severity": "LOW",
-      "matched_term": "name",
-      "exposing_queries": [
-        "user",
-        "users"
-      ],
-      "attack_path": "query ExfiltrateData {\n  user {\n    username\n  }\n}"
-    },
-    {
-      "type_name": "NestedUser",
-      "field_name": "username",
-      "field_type": "String!",
-      "severity": "LOW",
-      "matched_term": "name",
-      "exposing_queries": [
-        "nested_user"
-      ],
-      "attack_path": "query ExfiltrateData {\n  nested_user {\n    username\n  }\n}"
-    }
-  ],
+  "sensitive_fields": [],
   "dos_attacks": {
     "batching": {
       "attack": "array_batching",
       "batch_size": 100,
-      "status_code": 200,
-      "elapsed_seconds": 0.307,
-      "response_size_bytes": 13700,
-      "vulnerable": true,
-      "blocked": false,
-      "message": "SERVER IS VULNERABLE \u2014 executed all 100 queries. Response: 13700 bytes in 0.31s",
-      "responses_returned": 100
+      "status_code": 400,
+      "elapsed_seconds": 0.026,
+      "response_size_bytes": 217,
+      "vulnerable": false,
+      "blocked": true,
+      "message": "Server returned 400 \u2014 batch likely blocked"
     },
     "nesting": [
       {
         "attack": "deep_nesting",
         "depth": 2,
-        "status_code": 200,
-        "elapsed_seconds": 0.013,
-        "response_size_bytes": 153,
+        "status_code": 502,
+        "elapsed_seconds": 0.08,
+        "response_size_bytes": 84,
         "blocked": false,
         "error": null
       },
       {
         "attack": "deep_nesting",
         "depth": 5,
-        "status_code": 200,
-        "elapsed_seconds": 0.017,
-        "response_size_bytes": 153,
-        "blocked": false,
-        "error": null
+        "status_code": 400,
+        "elapsed_seconds": 0.029,
+        "response_size_bytes": 214,
+        "blocked": true,
+        "error": "Query depth 6 exceeds maximum allowed depth of 5"
       },
       {
         "attack": "deep_nesting",
         "depth": 10,
-        "status_code": 200,
-        "elapsed_seconds": 0.025,
-        "response_size_bytes": 153,
-        "blocked": false,
-        "error": null
+        "status_code": 400,
+        "elapsed_seconds": 0.01,
+        "response_size_bytes": 216,
+        "blocked": true,
+        "error": "Query depth 11 exceeds maximum allowed depth of 5"
       },
       {
         "attack": "deep_nesting",
         "depth": 20,
-        "status_code": 200,
-        "elapsed_seconds": 0.02,
-        "response_size_bytes": 153,
-        "blocked": false,
-        "error": null
+        "status_code": 400,
+        "elapsed_seconds": 0.011,
+        "response_size_bytes": 216,
+        "blocked": true,
+        "error": "Query depth 21 exceeds maximum allowed depth of 5"
       },
       {
         "attack": "deep_nesting",
         "depth": 50,
-        "status_code": 200,
-        "elapsed_seconds": 0.034,
-        "response_size_bytes": 153,
-        "blocked": false,
-        "error": null
+        "status_code": 400,
+        "elapsed_seconds": 0.011,
+        "response_size_bytes": 216,
+        "blocked": true,
+        "error": "Query depth 51 exceeds maximum allowed depth of 5"
       }
     ]
   },
@@ -465,12 +70,14 @@
       "argument": "query",
       "payload_name": "SQLi_always_true",
       "payload_value": "' OR '1'='1",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": 0.02,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 271,
+      "size_delta": 185,
+      "time_delta": -0.028,
+      "indicators": [
+        "response size changed by 185 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"' OR '1'='1\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -478,12 +85,14 @@
       "argument": "query",
       "payload_name": "SQLi_comment_bypass",
       "payload_value": "' OR 1=1 --",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": 0.016,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 268,
+      "size_delta": 182,
+      "time_delta": -0.01,
+      "indicators": [
+        "response size changed by 182 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"' OR 1=1 --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -491,12 +100,14 @@
       "argument": "query",
       "payload_name": "SQLi_union_probe",
       "payload_value": "' UNION SELECT 1,2,3 --",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": -0.001,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 258,
+      "size_delta": 172,
+      "time_delta": -0.011,
+      "indicators": [
+        "response size changed by 172 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"' UNION SELECT 1,2,3 --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -504,12 +115,14 @@
       "argument": "query",
       "payload_name": "SQLi_sleep_mysql",
       "payload_value": "' OR SLEEP(3) --",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": 0.003,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 248,
+      "size_delta": 162,
+      "time_delta": -0.008,
+      "indicators": [
+        "response size changed by 162 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"' OR SLEEP(3) --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -517,12 +130,14 @@
       "argument": "query",
       "payload_name": "SQLi_sleep_postgres",
       "payload_value": "' OR pg_sleep(3) --",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": -0.002,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 248,
+      "size_delta": 162,
+      "time_delta": -0.024,
+      "indicators": [
+        "response size changed by 162 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"' OR pg_sleep(3) --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -530,12 +145,14 @@
       "argument": "query",
       "payload_name": "SQLi_drop_probe",
       "payload_value": "'; DROP TABLE users; --",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": -0.003,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 266,
+      "size_delta": 180,
+      "time_delta": -0.021,
+      "indicators": [
+        "response size changed by 180 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"'; DROP TABLE users; --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -543,10 +160,10 @@
       "argument": "query",
       "payload_name": "SQLi_stacked",
       "payload_value": "1'; SELECT 1 --",
-      "baseline_size": 177,
-      "injected_size": 177,
+      "baseline_size": 86,
+      "injected_size": 86,
       "size_delta": 0,
-      "time_delta": 0.028,
+      "time_delta": 0.014,
       "indicators": [],
       "vulnerable": false,
       "injected_query": "query InjectionTest {\n  search_users(query: \"1'; SELECT 1 --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
@@ -556,12 +173,14 @@
       "argument": "query",
       "payload_name": "NoSQLi_gt_operator",
       "payload_value": "{\"$gt\": \"\"}",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": -0.018,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 287,
+      "size_delta": 201,
+      "time_delta": -0.001,
+      "indicators": [
+        "response size changed by 201 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$gt\\\": \\\"\\\"}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -569,12 +188,14 @@
       "argument": "query",
       "payload_name": "NoSQLi_ne_operator",
       "payload_value": "{\"$ne\": null}",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": -0.022,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 287,
+      "size_delta": 201,
+      "time_delta": -0.011,
+      "indicators": [
+        "response size changed by 201 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$ne\\\": null}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -582,12 +203,14 @@
       "argument": "query",
       "payload_name": "NoSQLi_where_clause",
       "payload_value": "{\"$where\": \"sleep(3000)\"}",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": -0.01,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 248,
+      "size_delta": 162,
+      "time_delta": -0.013,
+      "indicators": [
+        "response size changed by 162 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$where\\\": \\\"sleep(3000)\\\"}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     },
     {
@@ -595,22 +218,24 @@
       "argument": "query",
       "payload_name": "NoSQLi_regex",
       "payload_value": "{\"$regex\": \".*\"}",
-      "baseline_size": 177,
-      "injected_size": 177,
-      "size_delta": 0,
-      "time_delta": -0.016,
-      "indicators": [],
-      "vulnerable": false,
+      "baseline_size": 86,
+      "injected_size": 290,
+      "size_delta": 204,
+      "time_delta": 0.001,
+      "indicators": [
+        "response size changed by 204 bytes"
+      ],
+      "vulnerable": true,
       "injected_query": "query InjectionTest {\n  search_users(query: \"{\\\"$regex\\\": \\\".*\\\"}\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
     }
   ],
   "summary": {
-    "introspection_exposed": true,
-    "high_sensitivity_fields": 5,
-    "total_sensitive_fields": 9,
-    "batching_vulnerable": true,
+    "introspection_exposed": false,
+    "high_sensitivity_fields": 0,
+    "total_sensitive_fields": 0,
+    "batching_vulnerable": false,
     "nesting_vulnerable": true,
-    "injection_vulnerable": false,
-    "overall_risk": "CRITICAL"
+    "injection_vulnerable": true,
+    "overall_risk": "HIGH"
   }
 }
