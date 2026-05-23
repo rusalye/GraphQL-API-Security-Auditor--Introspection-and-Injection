@@ -17,11 +17,14 @@ Connection: mongodb://mongodb:27017/graphql_api
 import strawberry
 from strawberry.fastapi import GraphQLRouter
 from strawberry.schema.config import StrawberryConfig
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 import uvicorn
 from pymongo import MongoClient
 import os
+import json
+from datetime import datetime, timezone
 
 # ── MongoDB Connection ─────────────────────────────────────────────────────────
 
@@ -216,7 +219,61 @@ schema = strawberry.Schema(
 graphql_app = GraphQLRouter(schema)
 
 app = FastAPI(title="Vulnerable GraphQL API — Hackathon Target")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(graphql_app, prefix="/graphql")
+
+# Track incoming queries
+vuln_stats = {
+    "total_requests": 0,
+    "recent_requests": []
+}
+
+@app.middleware("http")
+async def track_requests(request: Request, call_next):
+    if request.url.path == "/graphql" and request.method == "POST":
+        vuln_stats["total_requests"] += 1
+        
+        # We need to read body, but it consumes the stream.
+        # We can just store a simplified version or read and recreate.
+        body_bytes = await request.body()
+        
+        try:
+            body = json.loads(body_bytes)
+            if isinstance(body, dict):
+                query_preview = body.get("query", "")[:120]
+            elif isinstance(body, list):
+                query_preview = f"[BATCH: {len(body)} queries]"
+            else:
+                query_preview = str(body)[:120]
+        except:
+            query_preview = str(body_bytes)[:120]
+            
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "client_ip": request.client.host if request.client else "unknown",
+            "query_preview": query_preview
+        }
+        vuln_stats["recent_requests"].insert(0, entry)
+        vuln_stats["recent_requests"] = vuln_stats["recent_requests"][:20]
+        
+        # Pass the request body back into the stream
+        async def receive():
+            return {"type": "http.request", "body": body_bytes}
+        request._receive = receive
+
+    response = await call_next(request)
+    return response
+
+@app.get("/vuln_stats")
+def get_vuln_stats():
+    return vuln_stats
 
 @app.get("/")
 def root():

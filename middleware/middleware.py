@@ -23,6 +23,7 @@ Run with:
 import httpx
 import json
 import time
+import os
 from datetime import datetime, timezone
 from typing import Optional
 from collections import defaultdict
@@ -49,7 +50,7 @@ app.add_middleware(
 )
 
 # ── Target backend URL ────────────────────────────────────────────────────────
-TARGET_GRAPHQL_URL = "http://localhost:4000/graphql"
+TARGET_GRAPHQL_URL = os.getenv("TARGET_GRAPHQL_URL", "http://localhost:4000/graphql")
 
 # ── Live Statistics ───────────────────────────────────────────────────────────
 
@@ -262,6 +263,7 @@ DASHBOARD_HTML = """
             margin: 0;
             padding: 2rem;
             min-height: 100vh;
+            overflow-x: hidden;
         }
         .header {
             display: flex;
@@ -359,8 +361,8 @@ DASHBOARD_HTML = """
 
         .dashboard-layout {
             display: grid;
-            grid-template-columns: 1fr 3fr;
-            gap: 2rem;
+            grid-template-columns: 250px 1fr 1fr;
+            gap: 1.5rem;
         }
         h2 {
             font-weight: 600;
@@ -368,6 +370,7 @@ DASHBOARD_HTML = """
             margin-top: 0;
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 0.5rem;
+            font-size: 1.1rem;
         }
         .panel {
             background: var(--card-bg);
@@ -376,12 +379,13 @@ DASHBOARD_HTML = """
             border-radius: 12px;
             padding: 1.5rem;
             overflow: auto;
+            max-height: 600px;
         }
         table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
         th {
             background: rgba(0,0,0,0.2);
@@ -416,13 +420,45 @@ DASHBOARD_HTML = """
         }
         .attack-tag {
             display: inline-block;
-            margin-left: 8px;
+            margin-top: 4px;
             padding: 2px 6px;
             border-radius: 4px;
             background: rgba(248, 81, 73, 0.2);
             color: #ff7b72;
-            font-size: 0.75em;
+            font-size: 0.85em;
             font-weight: 600;
+        }
+
+        /* Simulator Styles */
+        .sim-btn {
+            display: block;
+            width: 100%;
+            background: var(--border-color);
+            color: #fff;
+            border: none;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .sim-btn:hover {
+            background: var(--accent-blue);
+            color: #0d1117;
+        }
+        .sim-btn.danger { background: rgba(248, 81, 73, 0.2); color: #ff7b72; border: 1px solid rgba(248, 81, 73, 0.5); }
+        .sim-btn.danger:hover { background: #f85149; color: #fff; }
+        
+        .target-select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-family: inherit;
         }
     </style>
 </head>
@@ -463,23 +499,49 @@ DASHBOARD_HTML = """
     </div>
 
     <div class="dashboard-layout">
+        <!-- Panel 1: Attack Simulator -->
         <div class="panel">
-            <h2>Blocks by Rule</h2>
+            <h2>⚔️ Attack Simulator</h2>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Launch simulated attacks directly from the browser.
+            </p>
+            <label style="font-size: 0.8rem; font-weight: 600; display:block; margin-bottom:5px;">Target Endpoint:</label>
+            <select id="target-select" class="target-select">
+                <option value="http://localhost:8080/graphql">Middleware Proxy (Port 8080)</option>
+                <option value="http://localhost:4000/graphql">Vulnerable Target (Port 4000)</option>
+            </select>
+
+            <button class="sim-btn" style="background: rgba(63, 185, 80, 0.2); color: #7ee787; border: 1px solid rgba(63, 185, 80, 0.5);" onclick="launchAttack('legitimate')">✅ Send Legitimate Query</button>
+            <hr style="border-top: 1px dashed var(--border-color); border-bottom: none; margin: 15px 0;">
+            
+            <button class="sim-btn" onclick="launchAttack('introspection')">1. Schema Introspection</button>
+            <button class="sim-btn" onclick="launchAttack('nesting')">2. DoS (Deep Nesting)</button>
+            <button class="sim-btn" onclick="launchAttack('batching')">3. DoS (Array Batching)</button>
+            <button class="sim-btn" onclick="launchAttack('sqli')">4. SQL Injection</button>
+            <button class="sim-btn danger" style="margin-top: 15px;" onclick="launchSpam()">🔥 Launch All Attacks</button>
+        </div>
+
+        <!-- Panel 2: Middleware Feed -->
+        <div class="panel">
+            <h2>🛡️ Middleware Live Feed (Port 8080)</h2>
             <table>
                 <thead>
-                    <tr><th>Rule ID</th><th>Hits</th></tr>
+                    <tr><th>Time</th><th>Rule Blocked</th><th>Query Preview</th></tr>
                 </thead>
-                <tbody id="rules-tbody">
+                <tbody id="feed-tbody">
                 </tbody>
             </table>
         </div>
+
+        <!-- Panel 3: Vulnerable Backend Feed -->
         <div class="panel">
-            <h2>Live Threat Feed (Last 20 Blocks)</h2>
+            <h2>⚠️ Target API Feed (Port 4000)</h2>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin:0 0 10px 0;">Queries that successfully reached the backend.</p>
             <table>
                 <thead>
-                    <tr><th>Time</th><th>Rule / Attack Type</th><th>Attacker IP</th><th>Reason</th><th>Query Preview</th></tr>
+                    <tr><th>Time</th><th>Client IP</th><th>Query Preview</th></tr>
                 </thead>
-                <tbody id="feed-tbody">
+                <tbody id="vuln-feed-tbody">
                 </tbody>
             </table>
         </div>
@@ -495,42 +557,60 @@ DASHBOARD_HTML = """
             "R07": "Rate Limit Exceeded"
         };
 
+        /* --- Attack Simulator Logic --- */
+        async function sendAttack(payload) {
+            const url = document.getElementById('target-select').value;
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                fetchStats(); // force immediate refresh
+                fetchVulnStats();
+            } catch (err) {
+                console.error("Attack failed", err);
+            }
+        }
+
+        function launchAttack(type) {
+            if (type === 'legitimate') {
+                sendAttack({query: `query { search_users(query: "alice") { ... on SearchResult { count } } }`});
+            } else if (type === 'introspection') {
+                sendAttack({query: `query { __schema { types { name } } }`});
+            } else if (type === 'nesting') {
+                sendAttack({query: `query { nested_user(id:1) { friend { friend { friend { friend { friend { friend { friend { friend { username } } } } } } } } } }`});
+            } else if (type === 'sqli') {
+                sendAttack({query: `query { search_users(query: "' OR 1=1 --") { ... on SearchResult { count } } }`});
+            } else if (type === 'batching') {
+                const payload = [];
+                for(let i=0; i<50; i++) payload.push({query: `query { users { username } }`});
+                sendAttack(payload);
+            }
+        }
+
+        async function launchSpam() {
+            launchAttack('introspection');
+            setTimeout(() => launchAttack('sqli'), 100);
+            setTimeout(() => launchAttack('nesting'), 200);
+            setTimeout(() => launchAttack('batching'), 300);
+        }
+
+        /* --- Dashboard Polling Logic --- */
         async function fetchStats() {
             try {
                 const response = await fetch('/stats');
                 const data = await response.json();
                 
-                // Update top cards
                 document.getElementById('val-total').textContent = data.total_requests;
                 document.getElementById('val-blocked').textContent = data.blocked_requests;
                 document.getElementById('val-forwarded').textContent = data.forwarded_requests;
                 document.getElementById('val-rate').textContent = data.block_rate_percent;
 
-                // Update rules table
-                const rulesTbody = document.getElementById('rules-tbody');
-                rulesTbody.innerHTML = '';
-                const rules = Object.entries(data.blocks_by_rule);
-                if (rules.length === 0) {
-                    rulesTbody.innerHTML = '<tr><td colspan="2" class="empty-state">No blocks recorded yet</td></tr>';
-                } else {
-                    rules.sort((a,b) => b[1] - a[1]).forEach(([rule, count]) => {
-                        const tr = document.createElement('tr');
-                        const tdRule = document.createElement('td');
-                        const tdCount = document.createElement('td');
-                        const attackName = attackMap[rule] || "Unknown Attack";
-                        tdRule.innerHTML = `<code>${rule}</code> <span style="color:var(--text-muted); font-size:0.85em; margin-left:5px">${attackName}</span>`;
-                        tdCount.textContent = count;
-                        tr.appendChild(tdRule);
-                        tr.appendChild(tdCount);
-                        rulesTbody.appendChild(tr);
-                    });
-                }
-
-                // Update live feed
                 const feedTbody = document.getElementById('feed-tbody');
                 feedTbody.innerHTML = '';
                 if (data.recent_blocks.length === 0) {
-                    feedTbody.innerHTML = '<tr><td colspan="5" class="empty-state">No malicious activity detected</td></tr>';
+                    feedTbody.innerHTML = '<tr><td colspan="3" class="empty-state">No malicious activity detected</td></tr>';
                 } else {
                     data.recent_blocks.forEach(b => {
                         const tr = document.createElement('tr');
@@ -540,10 +620,7 @@ DASHBOARD_HTML = """
                         tdTime.textContent = date.toLocaleTimeString();
                         
                         const tdRule = document.createElement('td');
-                        const codeRule = document.createElement('code');
-                        codeRule.textContent = b.rule_id;
-                        tdRule.appendChild(codeRule);
-                        
+                        tdRule.innerHTML = `<code>${b.rule_id}</code><br>`;
                         const attackName = attackMap[b.rule_id];
                         if (attackName) {
                             const spanTag = document.createElement('span');
@@ -552,23 +629,13 @@ DASHBOARD_HTML = """
                             tdRule.appendChild(spanTag);
                         }
                         
-                        const tdIp = document.createElement('td');
-                        tdIp.textContent = b.client_ip;
-                        
-                        const tdReason = document.createElement('td');
-                        tdReason.textContent = b.reason;
-                        
                         const tdQuery = document.createElement('td');
-                        const smallQuery = document.createElement('small');
                         const codeQuery = document.createElement('code');
                         codeQuery.textContent = b.query_preview;
-                        smallQuery.appendChild(codeQuery);
-                        tdQuery.appendChild(smallQuery);
+                        tdQuery.appendChild(codeQuery);
 
                         tr.appendChild(tdTime);
                         tr.appendChild(tdRule);
-                        tr.appendChild(tdIp);
-                        tr.appendChild(tdReason);
                         tr.appendChild(tdQuery);
                         feedTbody.appendChild(tr);
                     });
@@ -578,6 +645,42 @@ DASHBOARD_HTML = """
             }
         }
         
+        async function fetchVulnStats() {
+            try {
+                const response = await fetch('http://localhost:4000/vuln_stats');
+                const data = await response.json();
+                
+                const feedTbody = document.getElementById('vuln-feed-tbody');
+                feedTbody.innerHTML = '';
+                if (data.recent_requests.length === 0) {
+                    feedTbody.innerHTML = '<tr><td colspan="3" class="empty-state">No requests received</td></tr>';
+                } else {
+                    data.recent_requests.forEach(b => {
+                        const tr = document.createElement('tr');
+                        
+                        const tdTime = document.createElement('td');
+                        const date = new Date(b.timestamp);
+                        tdTime.textContent = date.toLocaleTimeString();
+                        
+                        const tdIp = document.createElement('td');
+                        tdIp.textContent = b.client_ip;
+                        
+                        const tdQuery = document.createElement('td');
+                        const codeQuery = document.createElement('code');
+                        codeQuery.textContent = b.query_preview;
+                        tdQuery.appendChild(codeQuery);
+
+                        tr.appendChild(tdTime);
+                        tr.appendChild(tdIp);
+                        tr.appendChild(tdQuery);
+                        feedTbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                // Ignore errors if target is unreachable
+            }
+        }
+
         async function fetchHealth() {
             try {
                 const response = await fetch('/health');
@@ -585,7 +688,6 @@ DASHBOARD_HTML = """
                 const cfg = data.config;
                 
                 const container = document.getElementById('config-badges');
-                // clear previous badges
                 Array.from(container.children).forEach(c => {
                     if(c.tagName !== 'STRONG') container.removeChild(c);
                 });
@@ -604,17 +706,20 @@ DASHBOARD_HTML = """
                 addBadge(`R05 Injection Detection`, true);
                 addBadge(`R07 Rate Limit: ${cfg.rate_limit}`, true);
 
-            } catch (err) {
-                console.error("Failed to fetch health", err);
-            }
+            } catch (err) {}
         }
 
         // Initialize
         fetchHealth();
         fetchStats();
+        fetchVulnStats();
+        
         // Poll every 2 seconds
-        setInterval(fetchStats, 2000);
-        setInterval(fetchHealth, 10000); // health config updates less frequently
+        setInterval(() => {
+            fetchStats();
+            fetchVulnStats();
+        }, 2000);
+        setInterval(fetchHealth, 10000);
     </script>
 </body>
 </html>
