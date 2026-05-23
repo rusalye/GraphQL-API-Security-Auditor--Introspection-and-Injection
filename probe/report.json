@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-23T13:25:26.763308",
+  "timestamp": "2026-05-23T14:04:22.083609",
   "target": "http://localhost:8080/graphql",
   "introspection": {
     "disabled": true
@@ -21,7 +21,7 @@
         "attack": "deep_nesting",
         "depth": 2,
         "status_code": 502,
-        "elapsed_seconds": 0.03,
+        "elapsed_seconds": 0.023,
         "response_size_bytes": 84,
         "blocked": false,
         "error": null
@@ -30,7 +30,7 @@
         "attack": "deep_nesting",
         "depth": 5,
         "status_code": 400,
-        "elapsed_seconds": 0.022,
+        "elapsed_seconds": 0.01,
         "response_size_bytes": 214,
         "blocked": true,
         "error": "Query depth 6 exceeds maximum allowed depth of 5"
@@ -39,7 +39,7 @@
         "attack": "deep_nesting",
         "depth": 10,
         "status_code": 400,
-        "elapsed_seconds": 0.006,
+        "elapsed_seconds": 0.01,
         "response_size_bytes": 216,
         "blocked": true,
         "error": "Query depth 11 exceeds maximum allowed depth of 5"
@@ -48,7 +48,7 @@
         "attack": "deep_nesting",
         "depth": 20,
         "status_code": 400,
-        "elapsed_seconds": 0.007,
+        "elapsed_seconds": 0.021,
         "response_size_bytes": 216,
         "blocked": true,
         "error": "Query depth 21 exceeds maximum allowed depth of 5"
@@ -57,7 +57,7 @@
         "attack": "deep_nesting",
         "depth": 50,
         "status_code": 400,
-        "elapsed_seconds": 0.006,
+        "elapsed_seconds": 0.018,
         "response_size_bytes": 216,
         "blocked": true,
         "error": "Query depth 51 exceeds maximum allowed depth of 5"
@@ -73,7 +73,7 @@
       "baseline_size": 86,
       "injected_size": 271,
       "size_delta": 185,
-      "time_delta": -0.007,
+      "time_delta": -0.012,
       "indicators": [
         "response size changed by 185 bytes"
       ],
@@ -88,7 +88,7 @@
       "baseline_size": 86,
       "injected_size": 268,
       "size_delta": 182,
-      "time_delta": -0.007,
+      "time_delta": -0.013,
       "indicators": [
         "response size changed by 182 bytes"
       ],
@@ -103,7 +103,7 @@
       "baseline_size": 86,
       "injected_size": 258,
       "size_delta": 172,
-      "time_delta": -0.007,
+      "time_delta": -0.004,
       "indicators": [
         "response size changed by 172 bytes"
       ],
@@ -118,7 +118,7 @@
       "baseline_size": 86,
       "injected_size": 248,
       "size_delta": 162,
-      "time_delta": -0.007,
+      "time_delta": -0.019,
       "indicators": [
         "response size changed by 162 bytes"
       ],
@@ -133,7 +133,7 @@
       "baseline_size": 86,
       "injected_size": 248,
       "size_delta": 162,
-      "time_delta": -0.007,
+      "time_delta": -0.019,
       "indicators": [
         "response size changed by 162 bytes"
       ],
@@ -148,7 +148,7 @@
       "baseline_size": 86,
       "injected_size": 266,
       "size_delta": 180,
-      "time_delta": -0.007,
+      "time_delta": -0.02,
       "indicators": [
         "response size changed by 180 bytes"
       ],
@@ -163,7 +163,7 @@
       "baseline_size": 86,
       "injected_size": 86,
       "size_delta": 0,
-      "time_delta": 0.001,
+      "time_delta": -0.005,
       "indicators": [],
       "vulnerable": false,
       "injected_query": "query InjectionTest {\n  search_users(query: \"1'; SELECT 1 --\") {\n    ... on SearchResult { count users { id username email } }\n    ... on User { id username email }\n  }\n}"
@@ -191,7 +191,7 @@
       "baseline_size": 86,
       "injected_size": 287,
       "size_delta": 201,
-      "time_delta": -0.004,
+      "time_delta": -0.01,
       "indicators": [
         "response size changed by 201 bytes"
       ],
@@ -206,7 +206,7 @@
       "baseline_size": 86,
       "injected_size": 248,
       "size_delta": 162,
-      "time_delta": -0.003,
+      "time_delta": -0.006,
       "indicators": [
         "response size changed by 162 bytes"
       ],
@@ -221,7 +221,7 @@
       "baseline_size": 86,
       "injected_size": 290,
       "size_delta": 204,
-      "time_delta": -0.004,
+      "time_delta": -0.009,
       "indicators": [
         "response size changed by 204 bytes"
       ],
