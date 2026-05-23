@@ -1,6 +1,24 @@
 version: "3.9"
 
 services:
+  # MongoDB — Persistent database
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: graphql_api
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - graphql-net
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Vulnerable Target API — runs on port 4000
   target-api:
     build:
@@ -8,6 +26,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "4000:4000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks:
       - graphql-net
     restart: unless-stopped
@@ -26,6 +49,9 @@ services:
     networks:
       - graphql-net
     restart: unless-stopped
+
+volumes:
+  mongo_data:
 
 networks:
   graphql-net:
