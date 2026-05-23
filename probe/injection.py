@@ -60,6 +60,7 @@ def test_injection_on_field(
     baseline_value: str,
     payloads: List[tuple],
     timeout: int = 10,
+    token: str = None,
 ) -> List[Dict]:
     """
     For a given resolver (query_name) and argument (arg_name):
@@ -74,7 +75,7 @@ def test_injection_on_field(
     baseline_query = _build_query(query_name, arg_name, baseline_value)
     
     # Send baseline
-    baseline_response, baseline_time = _send_query(target_url, baseline_query, timeout)
+    baseline_response, baseline_time = _send_query(target_url, baseline_query, timeout, token=token)
     if baseline_response is None:
         print(f"[INJECTION]   ✗ Baseline request failed — skipping field")
         return findings
@@ -85,7 +86,7 @@ def test_injection_on_field(
     # Test each payload
     for payload_name, payload_value in payloads:
         injected_query = _build_query(query_name, arg_name, payload_value)
-        injected_response, injected_time = _send_query(target_url, injected_query, timeout)
+        injected_response, injected_time = _send_query(target_url, injected_query, timeout, token=token)
         
         if injected_response is None:
             continue
@@ -159,14 +160,18 @@ def _build_query(query_name: str, arg_name: str, arg_value: str) -> str:
     )
 
 
-def _send_query(target_url: str, query: str, timeout: int) -> tuple:
+def _send_query(target_url: str, query: str, timeout: int, token: str = None) -> tuple:
     """Send a query and return (response_json, elapsed_time). Returns (None, 0) on error."""
     try:
         start = time.time()
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        
         response = requests.post(
             target_url,
             json={"query": query},
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             timeout=timeout,
         )
         elapsed = time.time() - start
@@ -175,7 +180,7 @@ def _send_query(target_url: str, query: str, timeout: int) -> tuple:
         return None, 0
 
 
-def run_all_injection_tests(target_url: str, parsed_schema: dict) -> List[Dict]:
+def run_all_injection_tests(target_url: str, parsed_schema: dict, token: str = None) -> List[Dict]:
     """
     Automatically find string-argument fields in the schema and test them all.
     Falls back to known vulnerable fields if schema is unavailable.
@@ -205,6 +210,7 @@ def run_all_injection_tests(target_url: str, parsed_schema: dict) -> List[Dict]:
             target_url, query_name, arg_name,
             baseline_value="alice",
             payloads=SQL_PAYLOADS,
+            token=token,
         )
         all_findings.extend(sqli_findings)
         
@@ -213,6 +219,7 @@ def run_all_injection_tests(target_url: str, parsed_schema: dict) -> List[Dict]:
             target_url, query_name, arg_name,
             baseline_value="alice",
             payloads=NOSQL_PAYLOADS,
+            token=token,
         )
         all_findings.extend(nosql_findings)
     

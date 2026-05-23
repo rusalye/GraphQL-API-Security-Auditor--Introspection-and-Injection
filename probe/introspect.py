@@ -109,7 +109,7 @@ fragment TypeRef on __Type {
 """
 
 
-def run_introspection(target_url: str, timeout: int = 10) -> dict:
+def run_introspection(target_url: str, timeout: int = 10, token: str = None) -> dict:
     """
     Send introspection query to the target GraphQL endpoint.
     Returns parsed schema dict or raises on failure.
@@ -117,10 +117,14 @@ def run_introspection(target_url: str, timeout: int = 10) -> dict:
     print(f"\n[INTROSPECT] Sending introspection query to {target_url}")
     
     try:
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        
         response = requests.post(
             target_url,
             json={"query": INTROSPECTION_QUERY},
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             timeout=timeout,
         )
         
