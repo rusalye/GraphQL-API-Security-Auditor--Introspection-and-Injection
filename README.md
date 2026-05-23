@@ -47,107 +47,99 @@ graphql-security-auditor/
 
 ---
 
-## Quick Start (RECOMMENDED: Docker Compose)
+## Quick Start (Cloud-Native Setup)
 
-### Option 1: Docker Compose (Easiest) ✅
-
-**Prerequisites:** Docker and Docker Compose installed
+### All you need is Docker Compose ✅
 
 ```bash
-# Start all services at once (MongoDB + Target API + Middleware)
+# 1. Start all services (MongoDB + Target API + Middleware)
+cd c:\Users\anvit\Desktop\GraphQL-API-Security-Auditor--Introspection-and-Injection
 docker-compose up
-
-# Wait for output:
-# [DATABASE] ✓ Connected to MongoDB
-# INFO:     Uvicorn running on http://0.0.0.0:4000
-# INFO:     Uvicorn running on http://0.0.0.0:8080
 ```
 
-**Services running:**
-- ✅ **MongoDB** on `localhost:27017` (persistent in `mongo_data/` volume)
-- ✅ **Target API** on `http://localhost:4000/graphql`
-- ✅ **Middleware** on `http://localhost:8080/graphql`
-
-**Verify services are running:**
-
-```bash
-# In another terminal:
-
-# Check Target API
-curl http://localhost:4000/
-
-# Check Middleware health
-curl http://localhost:8080/health
-
-# Verify MongoDB (requires mongosh or mongo CLI)
-mongosh localhost:27017/graphql_api
-> db.users.find()
+**Wait for these messages:**
+```
+mongodb      | [initandlisten] waiting for connections on port 27017
+target-api   | INFO:     Uvicorn running on http://0.0.0.0:4000
+middleware   | INFO:     Uvicorn running on http://0.0.0.0:8080
 ```
 
-**Run the probe (in another terminal):**
+✅ **Services running:**
+- MongoDB: `localhost:27017`
+- Target API: `http://localhost:4000/graphql` (vulnerable)
+- Middleware: `http://localhost:8080/graphql` (protected)
+
+### In a new terminal, run the demo:
 
 ```bash
 cd probe
 pip install -r requirements.txt
 
-# Attack VULNERABLE target directly (port 4000)
+# See all 6 attacks succeed WITHOUT defense
 python probe.py --target http://localhost:4000/graphql
 
-# Attack PROTECTED target through middleware (port 8080)
-python probe.py --target http://localhost:8080/graphql
+# See all 6 attacks blocked WITH defense
+python probe.py --target http://localhost:8080/graphql --skip-dos
 ```
 
-**Stop all services:**
+### Or run the full integration test:
 
 ```bash
-docker-compose down
+cd tests
+python integration_test.py
+```
 
-# To also delete MongoDB data (WARNING: data loss):
-docker-compose down -v
+Shows side-by-side: 6 tests against unprotected API (all pass) vs protected API (all blocked).
+
+### For complete demo with Defense ON/OFF toggles:
+
+See **[DEMO.md](DEMO.md)** for the full demonstration script showing:
+- Defense OFF (all attacks succeed) → CRITICAL RISK 🔴
+- Defense ON (all attacks blocked) → LOW RISK 🟢
+
+### Cleanup:
+
+```bash
+# In Terminal 1 (where docker-compose is running):
+Ctrl+C
+
+# Then:
+docker-compose down
 ```
 
 ---
 
-### Option 2: Manual Setup (3 Terminals)
+## What This Project Does
 
-If you prefer running without Docker:
+### **Problem**
+A GraphQL API deployed without security controls exposes:
+- ✗ Full schema via introspection (`__schema` query)
+- ✗ Sensitive fields (passwords, tokens, SSN, credit cards)
+- ✗ Resource exhaustion via batching (100 queries in 1 request)
+- ✗ DoS via deep nesting (exponential resolver calls)
+- ✗ Injection vulnerabilities in resolver arguments
 
-**Terminal 1 — Start MongoDB:**
+### **Solution**
+This project builds and demonstrates:
 
-```bash
-# Requires MongoDB server installed locally or via Docker
-mongod                 # or: docker run -d -p 27017:27017 mongo:latest
-```
+**Offensive Phase — Probe Tool:**
+- Introspection: Dumps entire GraphQL schema
+- Field Scanner: Finds sensitive fields (password, token, api_key, etc.)
+- Batch Attack: Tests array-based query batching
+- Injection Tester: Tests SQL/NoSQL injection, SSTI, path traversal
 
-**Terminal 2 — Start the Vulnerable Target API:**
+**Defensive Phase — Middleware:**
+- R01: Blocks introspection queries
+- R02: Limits query depth (prevents nested DoS)
+- R03: Limits query complexity (prevents wide queries)
+- R04: Blocks array batching
+- R05: Blocks injection patterns
+- R07: Rate limiting (60 req/min per IP)
 
-```bash
-cd target_api
-pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 4000 --reload
-```
+**Live Dashboard:**
+Shows every blocked attack in real-time at `http://localhost:8080/stats/dashboard`
 
-Verify: `curl http://localhost:4000/` → should return JSON
-
-**Terminal 3 — Start the Security Middleware:**
-
-```bash
-cd middleware
-pip install -r requirements.txt
-export TARGET_GRAPHQL_URL=http://localhost:4000/graphql
-uvicorn middleware:app --host 0.0.0.0 --port 8080 --reload
-```
-
-Verify: `curl http://localhost:8080/health` → shows active rule config
-
-**Terminal 4 — Run the Probe Tool:**
-
-```bash
-cd probe
-pip install -r requirements.txt
-
-# Attack the VULNERABLE target directly (all attacks succeed)
-python probe.py --target http://localhost:4000/graphql
+---
 
 # Attack THROUGH THE MIDDLEWARE (all attacks blocked)
 python probe.py --target http://localhost:8080/graphql
