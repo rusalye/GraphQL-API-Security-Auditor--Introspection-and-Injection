@@ -1,466 +1,94 @@
-# GraphQL Security Auditor
+# GraphQL API Security Auditor
 
-**FoSC 23CSE313 Cyber Security Hackathon | Problem #18**  
-**Team | Amrita School of Computing, Bengaluru | 2026**
+**Problem Statement:** #18 - GraphQL API Security Auditor (Introspection & Injection)
+**Target Architecture:** Cloud-Native / Microservices (Application Layer)
 
----
+Team 05:
+Ananya Santosh- BL.EN.U4CSE23207
+Anvita Arasavilli- BL.EN.U4CSE23208
+Janhavi Nilesh Parate- BL.EN.U4CSE23224
+Keerthi DA- BL.EN.U4CSE23233
+Lakshmi Priya Subramanian- BL.EN.U4CSE23236
 
-## What This Solves
 
-A GraphQL API deployed without security controls exposes the entire data schema to any attacker,
-allows resource exhaustion via nested/batched queries, and accepts injected payloads in resolver
-arguments. This project builds:
+## What problem does this solve?
+A GraphQL API deployed without adequate security controls inherently exposes its entire data schema to any attacker via introspection. This lack of restriction allows malicious actors to map the API, discover sensitive fields, execute resource-exhausting nested or batched DoS queries, and exploit injection vulnerabilities in resolver arguments. This project solves these issues by providing a dual-purpose framework: an **offensive probe tool** to automatically discover these weaknesses, and a **defensive middleware reverse-proxy** that sits in front of any vulnerable GraphQL API to actively block such malicious traffic.
 
-1. **An offensive probe tool** that finds all these weaknesses automatically
-2. **A defensive middleware** that sits in front of any GraphQL API and blocks them
+## Which architecture does it target?
+**Cloud-Native** 
 
-MITRE ATT&CK: `T1190 — Exploit Public-Facing Application`  
-Architecture: Cloud-Native
+This project is built and distributed using Docker Compose, orchestrating the target API, the security middleware, and a MongoDB backend within isolated containers. It acts as a microservice proxy layer that can be seamlessly dropped into existing cloud environments.
 
----
+## What MITRE ATT&CK techniques does it address?
+*   **T1190 — Exploit Public-Facing Application**: The primary technique addressed. The defensive middleware blocks attempts to exploit the GraphQL endpoint via injection, deep nesting, and batching.
+*   **T1596.005 — Search Open Technical Databases (API Mapping)**: Addressed by blocking introspection queries (R01 rule), preventing attackers from mapping out the API schema.
+*   **T1499.004 — Endpoint Denial of Service (Application or System Exploitation)**: Addressed by limiting query depth (R02 rule) and query complexity (R03 rule), mitigating DoS attacks via recursive queries.
+*   **T1498 — Network Denial of Service**: Mitigated by rate limiting (R07 rule) and blocking array batching (R04 rule) to stop attackers from sending massive query arrays.
 
-## Repository Structure
+## How do you run it?
 
-```
-graphql-security-auditor/
-├── target_api/          # Deliberately vulnerable GraphQL API (the attack target)
-│   ├── app.py           # GraphQL server with MongoDB backend
-│   ├── Dockerfile
-│   └── requirements.txt
-├── probe/               # Offensive tool — 4 attack modules
-│   ├── probe.py         # Main orchestrator (run this)
-│   ├── introspect.py    # Schema dumper
-│   ├── scanner.py       # Sensitive field detector
-│   ├── batch_attack.py  # DoS via batching + deep nesting
-│   ├── injection.py     # SQLi / NoSQL injection tester
-│   └── requirements.txt
-├── middleware/          # Defensive middleware — FastAPI reverse proxy
-│   ├── middleware.py    # Main proxy server
-│   ├── rules.py         # Security rules engine
-│   ├── Dockerfile
-│   └── requirements.txt
-├── tests/
-│   └── integration_test.py  # Full demo script (attack vs defence)
-├── docker-compose.yml   # Orchestrates all services (MongoDB + API + Middleware)
-└── README.md
-```
-
----
-
-## Quick Start (Cloud-Native Setup)
-
-### All you need is Docker Compose ✅
+### Step 1: Start the Environment
+All services (MongoDB, Vulnerable Target API, and Defensive Middleware) are orchestrated via Docker Compose.
 
 ```bash
-# 1. Start all services (MongoDB + Target API + Middleware)
-cd c:\Users\anvit\Desktop\GraphQL-API-Security-Auditor--Introspection-and-Injection
-docker-compose up
+# Start all services in the background
+docker-compose up -d
+
+# Verify everything is running:
+# MongoDB: localhost:27017
+# Target API (Vulnerable): http://localhost:4000/graphql
+# Middleware (Protected): http://localhost:8080/graphql
 ```
 
-**Wait for these messages:**
-```
-mongodb      | [initandlisten] waiting for connections on port 27017
-target-api   | INFO:     Uvicorn running on http://0.0.0.0:4000
-middleware   | INFO:     Uvicorn running on http://0.0.0.0:8080
-```
-
-✅ **Services running:**
-- MongoDB: `localhost:27017`
-- Target API: `http://localhost:4000/graphql` (vulnerable)
-- Middleware: `http://localhost:8080/graphql` (protected)
-
-### In a new terminal, run the demo:
+### Step 2: Run the Offensive Probe (Without Defense)
+Run the probe against the vulnerable API to see all attacks succeed.
 
 ```bash
+# Navigate to the probe directory and install dependencies
 cd probe
 pip install -r requirements.txt
 
-# See all 6 attacks succeed WITHOUT defense
+# Run the full attack suite against the unprotected target
 python probe.py --target http://localhost:4000/graphql
-
-# See all 6 attacks blocked WITH defense
-python probe.py --target http://localhost:8080/graphql --skip-dos
 ```
 
-### Or run the full integration test:
+### Step 3: Run the Offensive Probe (With Defense)
+Run the exact same attack suite through the secure middleware to see attacks get blocked.
 
 ```bash
-cd tests
-python integration_test.py
-```
-
-Shows side-by-side: 6 tests against unprotected API (all pass) vs protected API (all blocked).
-
-### For complete demo with Defense ON/OFF toggles:
-
-See **[DEMO.md](DEMO.md)** for the full demonstration script showing:
-- Defense OFF (all attacks succeed) → CRITICAL RISK 🔴
-- Defense ON (all attacks blocked) → LOW RISK 🟢
-
-### Cleanup:
-
-```bash
-# In Terminal 1 (where docker-compose is running):
-Ctrl+C
-
-# Then:
-docker-compose down
-```
-
----
-
-## What This Project Does
-
-### **Problem**
-A GraphQL API deployed without security controls exposes:
-- ✗ Full schema via introspection (`__schema` query)
-- ✗ Sensitive fields (passwords, tokens, SSN, credit cards)
-- ✗ Resource exhaustion via batching (100 queries in 1 request)
-- ✗ DoS via deep nesting (exponential resolver calls)
-- ✗ Injection vulnerabilities in resolver arguments
-
-### **Solution**
-This project builds and demonstrates:
-
-**Offensive Phase — Probe Tool:**
-- Introspection: Dumps entire GraphQL schema
-- Field Scanner: Finds sensitive fields (password, token, api_key, etc.)
-- Batch Attack: Tests array-based query batching
-- Injection Tester: Tests SQL/NoSQL injection, SSTI, path traversal
-
-**Defensive Phase — Middleware:**
-- R01: Blocks introspection queries
-- R02: Limits query depth (prevents nested DoS)
-- R03: Limits query complexity (prevents wide queries)
-- R04: Blocks array batching
-- R05: Blocks injection patterns
-- R07: Rate limiting (60 req/min per IP)
-
-**Live Dashboard:**
-Shows every blocked attack in real-time at `http://localhost:8080/stats/dashboard`
-
----
-
-# Attack THROUGH THE MIDDLEWARE (all attacks blocked)
+# Run against the middleware to verify protections
 python probe.py --target http://localhost:8080/graphql
 ```
 
----
+### Step 4: Monitor Live Blocks
+Navigate to the live HTML dashboard in your browser to monitor the real-time blocking statistics:
+*   **Dashboard**: `http://localhost:8080/stats/dashboard`
 
-## Database
-
-### MongoDB Setup
-
-**Auto-seeded data:**
-- Database: `graphql_api`
-- Collection: `users` (2 test users: alice, bob)
-- Collection: `posts` (2 test posts)
-- Connection string: `mongodb://localhost:27017`
-
-**Collections are automatically created and seeded when the target API starts.**
-
-To inspect the database:
-
+### Step 5: Cleanup
 ```bash
-# Connect via mongosh
-mongosh localhost:27017/graphql_api
-
-# List all collections
-> show collections
-
-# View users
-> db.users.find()
-
-# View posts
-> db.posts.find()
-
-# Count documents
-> db.users.countDocuments()
+# Stop and remove the containers
+docker-compose down
 ```
 
-### Persistent Data
-
-Data is stored in a named Docker volume: `mongo_data:`
-
-- **Survives container restarts** (`docker-compose down` then `docker-compose up`)
-- **Deleted only with** `docker-compose down -v`
-
----
-
-## Demo Script (Hackathon Presentation)
-
-```bash
-cd tests
-pip install -r ../probe/requirements.txt  # Install dependencies
-python integration_test.py
-```
-
-This runs **6 attack tests** twice:
-- **Round 1** against the unprotected API → all succeed (vulnerable)
-- **Round 2** through the middleware → all blocked (defended)
-
-Output is colour-coded PASS/FAIL per test.
-
----
-
-## What the Probe Tool Tests
-
-| Module | Attack | What It Finds |
-|--------|--------|---------------|
-| `introspect.py` | Introspection query | Full schema dump, all types, all fields |
-| `scanner.py` | Sensitive field analysis | `password`, `token`, `ssn`, `api_key`, `credit_card` exposure |
-| `batch_attack.py` | Array batching | 100 queries in 1 HTTP request (rate limit bypass) |
-| `batch_attack.py` | Deep nesting | 50-level recursive query (CPU exhaustion) |
-| `injection.py` | SQL injection | `' OR 1=1 --`, UNION, time-based |
-| `injection.py` | NoSQL injection | `$gt`, `$ne`, `$where` MongoDB operators |
-
----
-
-## What the Middleware Blocks
-
-| Rule | Policy | Blocks |
-|------|--------|--------|
-| R01 | Introspection disabled in production | `__schema`, `__type` queries |
-| R02 | Max query depth: 5 | Nested queries beyond 5 levels |
-| R03 | Max complexity: 100 fields | Expensive field-heavy queries |
-| R04 | Array batching disabled | JSON array requests |
-| R05 | Injection pattern detection | SQLi/NoSQLi patterns in args |
-| R07 | Rate limit: 60 req/min per IP | Automated scanning tools |
-
----
-
-## Live Dashboard
-
-Once the middleware is running:
-
-```
-http://localhost:8080/stats/dashboard   ← Live block log (auto-refreshes)
-http://localhost:8080/stats             ← JSON stats
-http://localhost:8080/health            ← Current rule config
-```
-
----
-
-## Runtime Config (Toggle Rules Live for Demo)
-
-```bash
-# Edit middleware/rules.py Config class to change rules:
-
-class Config:
-    ALLOW_INTROSPECTION = False              # Set True to allow introspection in dev
-    MAX_QUERY_DEPTH = 5                      # Increase to allow deeper queries
-    MAX_QUERY_COMPLEXITY = 100               # Increase for more field selections
-    ALLOW_BATCHING = False                   # Set True to allow batching
-    RATE_LIMIT_REQUESTS_PER_MINUTE = 60      # Adjust rate limit
-```
-
-Then restart:
-```bash
-docker-compose restart middleware
-```
-
-Or manually:
-```bash
-cd middleware
-uvicorn middleware:app --reload  # Auto-reloads on file changes
-```
-
----
-
-## Probe Tool Commands
-
-Run attacks with different configurations:
-
-```bash
-cd probe
-
-# Basic attack (100 queries in batch, depths 2-50)
-python probe.py --target http://localhost:4000/graphql
-
-# Custom batch size
-python probe.py --target http://localhost:4000/graphql --batch-size 500
-
-# Custom nesting depths
-python probe.py --target http://localhost:4000/graphql --depths 2 5 10 15 30
-
-# Skip DoS tests (useful when testing protected API)
-python probe.py --target http://localhost:8080/graphql --skip-dos
-
-# Custom output file
-python probe.py --target http://localhost:4000/graphql --output my_report.json
-
-# Combined options
-python probe.py \
-  --target http://localhost:8080/graphql \
-  --batch-size 200 \
-  --depths 5 10 20 \
-  --skip-dos \
-  --output middleware_attack_report.json
-```
-
-**Output files:**
-- `report.json` — Machine-readable attack results
-- Console output — Colored, human-readable results
-
----
-
-## Troubleshooting
-
-### MongoDB not connecting
-
-```
-Error: Cannot connect to mongodb://mongodb:27017
-```
-
-**Solution:**
-```bash
-# Ensure MongoDB container is running
-docker-compose ps  # Check if mongodb service shows "Up"
-
-# If not, restart
-docker-compose restart mongodb
-
-# Wait a few seconds for MongoDB to be ready
-docker-compose logs mongodb
-```
-
-### Target API crashes on startup
-
-```
-pymongo.errors.ServerSelectionTimeoutError: No servers found yet
-```
-
-**Solution:**
-```bash
-# MongoDB might not be ready yet. Wait and retry:
-docker-compose logs target-api
-
-# Restart target-api after MongoDB is healthy
-docker-compose restart target-api
-```
-
-### Middleware returns 502 (Bad Gateway)
-
-```
-"errors": [{"message": "Cannot reach backend API at http://target-api:4000/graphql"}]
-```
-
-**Solution:**
-```bash
-# Ensure target-api is running
-docker-compose ps
-
-# Check target-api logs
-docker-compose logs target-api
-
-# Restart both
-docker-compose restart target-api middleware
-```
-
-### Port already in use (e.g., 4000 or 8080)
-
-```
-ERROR: Address already in use 0.0.0.0:4000
-```
-
-**Solution:**
-```bash
-# Option 1: Kill the process using that port
-# On Windows:
-netstat -ano | findstr :4000
-taskkill /PID <PID> /F
-
-# Option 2: Change the port in docker-compose.yml
-# Edit: "4000:4000" to "5000:4000"
-```
-
-### Probe tool cannot connect to API
-
-```
-[ERROR] Cannot reach target: Connection refused
-```
-
-**Solution:**
-```bash
-# Ensure services are running
-docker-compose ps
-
-# Test connectivity manually
-curl http://localhost:4000/
-curl http://localhost:8080/health
-
-# If using Windows, try 127.0.0.1 instead of localhost
-python probe.py --target http://127.0.0.1:4000/graphql
-```
-
-### MongoDB data persists but I want to reset
-
-```bash
-# Delete the persistent volume (WARNING: deletes all data)
-docker-compose down -v
-
-# Restart with fresh data
-docker-compose up
-```
-
-### How to verify everything is working
-
-```bash
-# 1. Check all containers are running
-docker-compose ps
-
-# 2. Check MongoDB has data
-mongosh localhost:27017/graphql_api
-> db.users.count()  # should show 2
-
-# 3. Check Target API responds
-curl http://localhost:4000/
-
-# 4. Check Middleware is proxying
-curl http://localhost:8080/health
-
-# 5. Check Middleware blocks introspection
-curl -X POST http://localhost:8080/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query": "{ __schema { types { name } } }"}'
-# Should return: "Introspection is disabled in production"
-
-# 6. Run probe tool
-cd probe && python probe.py --target http://localhost:4000/graphql
-```
-
----
-
-## Team Roles
-
-| Person | Component | Files |
-|--------|-----------|-------|
-| Person 1 | Probe — Introspection + Schema Scanner | `probe/introspect.py`, `probe/scanner.py` |
-| Person 2 | Probe — Batch + Injection attacks | `probe/batch_attack.py`, `probe/injection.py`, `probe/probe.py` |
-| Person 3 | Vulnerable Target API | `target_api/app.py` |
-| Person 4 | Defensive Middleware | `middleware/middleware.py`, `middleware/rules.py` |
-| Person 5 | Integration tests + Documentation | `tests/integration_test.py`, `README.md`, `report/threat_model.md` |
-
----
-
-## Known Limitations
-
-- Depth/complexity calculation uses brace-counting, not full AST parsing (sufficient for demo)
-- Rate limiter is in-memory only (resets on restart — use Redis for production)
-- Injection detection is signature-based, not semantic (evadable with encoding)
-- No authentication on the `/config` endpoint (demo only)
-
----
-
-## Dependencies
-
-```
-# target_api
-strawberry-graphql[fastapi], fastapi, uvicorn
-
-# probe
-requests
-
-# middleware
-fastapi, uvicorn, httpx
-```
+## What dependencies does it have?
+The project uses standard containerization and lightweight Python frameworks:
+*   **System Dependencies**: 
+    *   Docker & Docker Compose
+    *   Python 3.9+ (for running the probe tool locally)
+*   **Target API (`target_api`)**:
+    *   `strawberry-graphql[fastapi]`
+    *   `fastapi`
+    *   `uvicorn`
+    *   `pymongo`
+*   **Security Middleware (`middleware`)**:
+    *   `fastapi`
+    *   `uvicorn`
+    *   `httpx`
+*   **Probe Tool (`probe`)**:
+    *   `requests`
+
+## What are known limitations or gaps?
+*   **Heuristic AST Parsing**: The query depth and complexity calculations in the middleware use fast heuristics (regex and brace-counting) rather than a full, standard GraphQL Abstract Syntax Tree (AST) parser. While performant and sufficient for demonstrations, clever query formatting using fragments might bypass these checks.
+*   **In-Memory Rate Limiting & Stats**: The middleware rate limiter and block statistics are stored entirely in-memory. They will reset upon container restart. For production deployment, this state must be offloaded to an external cache like Redis.
+*   **Signature-Based Injection Defense**: The `R05` injection detection uses signature-based regex patterns (`INJECTION_PATTERNS`). This can potentially be evaded by advanced encoding or obfuscation techniques, making it less robust than semantic database query parametrization.
+*   **Unauthenticated Config Endpoint**: The middleware exposes a `/config` endpoint to easily toggle rules on/off for demonstration purposes. This endpoint lacks authentication and is not secure for production use as-is.
