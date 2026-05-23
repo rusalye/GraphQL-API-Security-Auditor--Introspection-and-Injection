@@ -24,7 +24,7 @@ import httpx
 import json
 import time
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from collections import defaultdict
 
@@ -145,7 +145,7 @@ stats = {
     "blocks_by_rule": defaultdict(int),
     "blocks_by_ip": defaultdict(int),
     "recent_blocks": [],        # last 20 blocked requests
-    "start_time": datetime.now().isoformat(),
+    "start_time": datetime.now(timezone.utc).isoformat(),
 }
 
 
@@ -155,7 +155,7 @@ def record_block(rule_id: str, reason: str, client_ip: str, query_preview: str):
     stats["blocks_by_ip"][client_ip] += 1
     
     entry = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "rule_id": rule_id,
         "reason": reason,
         "client_ip": client_ip,
@@ -321,100 +321,394 @@ def get_stats():
     }
 
 
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GraphQL Security Auditor — SOC Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: rgba(22, 27, 34, 0.7);
+            --border-color: rgba(48, 54, 61, 0.5);
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            color: var(--accent-blue);
+            margin: 0;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+        }
+        .status-pulse {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-green);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-green);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(63, 185, 80, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .text-blue { color: var(--accent-blue); }
+        .text-red { color: var(--accent-red); text-shadow: 0 0 15px rgba(248, 81, 73, 0.4); }
+        .text-green { color: var(--accent-green); }
+        .text-yellow { color: var(--accent-yellow); }
+        
+        .config-bar {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .badge-red { background: rgba(248, 81, 73, 0.1); color: var(--accent-red); border: 1px solid rgba(248, 81, 73, 0.3); }
+        .badge-green { background: rgba(63, 185, 80, 0.1); color: var(--accent-green); border: 1px solid rgba(63, 185, 80, 0.3); }
+        .badge-yellow { background: rgba(210, 153, 34, 0.1); color: var(--accent-yellow); border: 1px solid rgba(210, 153, 34, 0.3); }
+
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 1fr 3fr;
+            gap: 2rem;
+        }
+        h2 {
+            font-weight: 600;
+            color: var(--text-main);
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+        .panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.85rem;
+        }
+        th {
+            background: rgba(0,0,0,0.2);
+            padding: 0.75rem;
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        th:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+        th:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.03); }
+        code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #ff7b72;
+            word-break: break-all;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .attack-tag {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(248, 81, 73, 0.2);
+            color: #ff7b72;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🛡 SOC Middleware Console</h1>
+            <div style="color: var(--text-muted); margin-top: 5px;">GraphQL API Security Auditor — Live Enforcement</div>
+        </div>
+        <div class="status-pulse">
+            <div class="dot"></div>
+            SYSTEM ACTIVE & MONITORING
+        </div>
+    </div>
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-number text-blue" id="val-total">0</div>
+            <div class="stat-label">Total Requests</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number text-red" id="val-blocked">0</div>
+            <div class="stat-label">Malicious Requests Blocked</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number text-green" id="val-forwarded">0</div>
+            <div class="stat-label">Clean Traffic Forwarded</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number text-yellow"><span id="val-rate">0</span>%</div>
+            <div class="stat-label">Block Rate</div>
+        </div>
+    </div>
+
+    <div class="config-bar" id="config-badges">
+        <strong style="color:var(--text-muted)">ACTIVE POLICIES:</strong>
+        <!-- Dynamically populated -->
+    </div>
+
+    <div class="dashboard-layout">
+        <div class="panel">
+            <h2>Blocks by Rule</h2>
+            <table>
+                <thead>
+                    <tr><th>Rule ID</th><th>Hits</th></tr>
+                </thead>
+                <tbody id="rules-tbody">
+                </tbody>
+            </table>
+        </div>
+        <div class="panel">
+            <h2>Live Threat Feed (Last 20 Blocks)</h2>
+            <table>
+                <thead>
+                    <tr><th>Time</th><th>Rule / Attack Type</th><th>Attacker IP</th><th>Reason</th><th>Query Preview</th></tr>
+                </thead>
+                <tbody id="feed-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const attackMap = {
+            "R01": "Schema Introspection",
+            "R02": "DoS: Deep Nesting",
+            "R03": "DoS: High Complexity",
+            "R04": "DoS: Array Batching",
+            "R05": "Injection Attack",
+            "R07": "Rate Limit Exceeded"
+        };
+
+        async function fetchStats() {
+            try {
+                const response = await fetch('/stats');
+                const data = await response.json();
+                
+                // Update top cards
+                document.getElementById('val-total').textContent = data.total_requests;
+                document.getElementById('val-blocked').textContent = data.blocked_requests;
+                document.getElementById('val-forwarded').textContent = data.forwarded_requests;
+                document.getElementById('val-rate').textContent = data.block_rate_percent;
+
+                // Update rules table
+                const rulesTbody = document.getElementById('rules-tbody');
+                rulesTbody.innerHTML = '';
+                const rules = Object.entries(data.blocks_by_rule);
+                if (rules.length === 0) {
+                    rulesTbody.innerHTML = '<tr><td colspan="2" class="empty-state">No blocks recorded yet</td></tr>';
+                } else {
+                    rules.sort((a,b) => b[1] - a[1]).forEach(([rule, count]) => {
+                        const tr = document.createElement('tr');
+                        const tdRule = document.createElement('td');
+                        const tdCount = document.createElement('td');
+                        const attackName = attackMap[rule] || "Unknown Attack";
+                        tdRule.innerHTML = `<code>${rule}</code> <span style="color:var(--text-muted); font-size:0.85em; margin-left:5px">${attackName}</span>`;
+                        tdCount.textContent = count;
+                        tr.appendChild(tdRule);
+                        tr.appendChild(tdCount);
+                        rulesTbody.appendChild(tr);
+                    });
+                }
+
+                // Update live feed
+                const feedTbody = document.getElementById('feed-tbody');
+                feedTbody.innerHTML = '';
+                if (data.recent_blocks.length === 0) {
+                    feedTbody.innerHTML = '<tr><td colspan="5" class="empty-state">No malicious activity detected</td></tr>';
+                } else {
+                    data.recent_blocks.forEach(b => {
+                        const tr = document.createElement('tr');
+                        
+                        const tdTime = document.createElement('td');
+                        const date = new Date(b.timestamp);
+                        tdTime.textContent = date.toLocaleTimeString();
+                        
+                        const tdRule = document.createElement('td');
+                        const codeRule = document.createElement('code');
+                        codeRule.textContent = b.rule_id;
+                        tdRule.appendChild(codeRule);
+                        
+                        const attackName = attackMap[b.rule_id];
+                        if (attackName) {
+                            const spanTag = document.createElement('span');
+                            spanTag.className = 'attack-tag';
+                            spanTag.textContent = attackName;
+                            tdRule.appendChild(spanTag);
+                        }
+                        
+                        const tdIp = document.createElement('td');
+                        tdIp.textContent = b.client_ip;
+                        
+                        const tdReason = document.createElement('td');
+                        tdReason.textContent = b.reason;
+                        
+                        const tdQuery = document.createElement('td');
+                        const smallQuery = document.createElement('small');
+                        const codeQuery = document.createElement('code');
+                        codeQuery.textContent = b.query_preview;
+                        smallQuery.appendChild(codeQuery);
+                        tdQuery.appendChild(smallQuery);
+
+                        tr.appendChild(tdTime);
+                        tr.appendChild(tdRule);
+                        tr.appendChild(tdIp);
+                        tr.appendChild(tdReason);
+                        tr.appendChild(tdQuery);
+                        feedTbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to fetch stats", err);
+            }
+        }
+        
+        async function fetchHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                const cfg = data.config;
+                
+                const container = document.getElementById('config-badges');
+                // clear previous badges
+                Array.from(container.children).forEach(c => {
+                    if(c.tagName !== 'STRONG') container.removeChild(c);
+                });
+
+                function addBadge(text, isRed) {
+                    const span = document.createElement('span');
+                    span.className = 'badge ' + (isRed ? 'badge-red' : 'badge-green');
+                    span.textContent = text;
+                    container.appendChild(span);
+                }
+
+                addBadge(`R01 Introspection ${cfg.introspection_allowed ? 'ON' : 'OFF'}`, !cfg.introspection_allowed);
+                addBadge(`R02 Max Depth: ${cfg.max_depth}`, true);
+                addBadge(`R03 Max Complexity: ${cfg.max_complexity}`, true);
+                addBadge(`R04 Batching ${cfg.batching_allowed ? 'ON' : 'OFF'}`, !cfg.batching_allowed);
+                addBadge(`R05 Injection Detection`, true);
+                addBadge(`R07 Rate Limit: ${cfg.rate_limit}`, true);
+
+            } catch (err) {
+                console.error("Failed to fetch health", err);
+            }
+        }
+
+        // Initialize
+        fetchHealth();
+        fetchStats();
+        // Poll every 2 seconds
+        setInterval(fetchStats, 2000);
+        setInterval(fetchHealth, 10000); // health config updates less frequently
+    </script>
+</body>
+</html>
+"""
+
 @app.get("/stats/dashboard", response_class=HTMLResponse)
 def stats_dashboard():
-    """Simple HTML dashboard showing live stats."""
-    s = get_stats()
-    rows = "".join(
-        f"<tr><td>{b['timestamp']}</td><td><code>{b['rule_id']}</code></td>"
-        f"<td>{b['client_ip']}</td><td>{b['reason']}</td>"
-        f"<td><small><code>{b['query_preview']}</code></small></td></tr>"
-        for b in s["recent_blocks"]
-    )
-    rules_rows = "".join(
-        f"<tr><td>{rule}</td><td>{count}</td></tr>"
-        for rule, count in s["blocks_by_rule"].items()
-    )
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>GraphQL Security Middleware — Live Dashboard</title>
-      <meta http-equiv="refresh" content="3">
-      <style>
-        body {{ font-family: 'Courier New', monospace; background: #0d1117; color: #c9d1d9; margin: 2rem; }}
-        h1 {{ color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: .5rem; }}
-        h2 {{ color: #7ee787; margin-top: 2rem; }}
-        .stat-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1rem 0; }}
-        .stat-card {{ background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; text-align: center; }}
-        .stat-number {{ font-size: 2rem; font-weight: bold; color: #58a6ff; }}
-        .stat-label {{ font-size: .8rem; color: #8b949e; margin-top: .3rem; }}
-        .blocked {{ color: #f85149 !important; }}
-        .forwarded {{ color: #7ee787 !important; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: .85rem; }}
-        th {{ background: #21262d; padding: .5rem; text-align: left; border-bottom: 1px solid #30363d; color: #58a6ff; }}
-        td {{ padding: .4rem .5rem; border-bottom: 1px solid #21262d; }}
-        tr:hover {{ background: #161b22; }}
-        code {{ background: #21262d; padding: 2px 4px; border-radius: 3px; font-size: .85em; }}
-        .config {{ background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; margin: 1rem 0; }}
-        .badge {{ display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: .75rem; }}
-        .badge-red {{ background: #f8514933; color: #f85149; border: 1px solid #f85149; }}
-        .badge-green {{ background: #7ee78733; color: #7ee787; border: 1px solid #7ee787; }}
-      </style>
-    </head>
-    <body>
-      <h1>🛡 GraphQL Security Middleware — Live Dashboard</h1>
-      <small style="color:#8b949e">Auto-refreshes every 3 seconds | Target: {TARGET_GRAPHQL_URL}</small>
-
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="stat-number">{s['total_requests']}</div>
-          <div class="stat-label">Total Requests</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number blocked">{s['blocked_requests']}</div>
-          <div class="stat-label">Blocked 🚫</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number forwarded">{s['forwarded_requests']}</div>
-          <div class="stat-label">Forwarded ✅</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number">{s['block_rate_percent']}%</div>
-          <div class="stat-label">Block Rate</div>
-        </div>
-      </div>
-
-      <div class="config">
-        <strong>Active Rules:</strong>
-        &nbsp;
-        <span class="badge {'badge-red' if not Config.ALLOW_INTROSPECTION else 'badge-green'}">R01 Introspection {'OFF' if not Config.ALLOW_INTROSPECTION else 'ON'}</span>
-        &nbsp;
-        <span class="badge badge-red">R02 Max Depth: {Config.MAX_QUERY_DEPTH}</span>
-        &nbsp;
-        <span class="badge badge-red">R03 Max Complexity: {Config.MAX_QUERY_COMPLEXITY}</span>
-        &nbsp;
-        <span class="badge {'badge-red' if not Config.ALLOW_BATCHING else 'badge-green'}">R04 Batching {'OFF' if not Config.ALLOW_BATCHING else 'ON'}</span>
-        &nbsp;
-        <span class="badge badge-red">R05 Injection Detection</span>
-        &nbsp;
-        <span class="badge badge-red">R07 Rate Limit: {Config.RATE_LIMIT_REQUESTS_PER_MINUTE}/min</span>
-      </div>
-
-      <h2>Blocks by Rule</h2>
-      <table>
-        <tr><th>Rule</th><th>Count</th></tr>
-        {rules_rows if rules_rows else '<tr><td colspan="2" style="color:#8b949e">No blocks yet</td></tr>'}
-      </table>
-
-      <h2>Recent Blocked Requests (last 20)</h2>
-      <table>
-        <tr><th>Timestamp</th><th>Rule</th><th>IP</th><th>Reason</th><th>Query Preview</th></tr>
-        {rows if rows else '<tr><td colspan="5" style="color:#8b949e">No blocks recorded yet</td></tr>'}
-      </table>
-    </body>
-    </html>
-    """
+    """Live HTML dashboard with JS polling and XSS prevention."""
+    return HTMLResponse(content=DASHBOARD_HTML)
 
 
 # ── Runtime Config Toggle ─────────────────────────────────────────────────────
