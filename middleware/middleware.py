@@ -24,15 +24,46 @@ import httpx
 import json
 import time
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from collections import defaultdict
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import jwt
 
 from rules import validate_request, Config
+
+# ── JWT Configuration ─────────────────────────────────────────────────────────
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = "HS256"
+TOKEN_EXPIRATION_HOURS = 12
+
+# Demo users: {username: (password, role)}
+DEMO_USERS = {
+    "admin": ("admin123", "admin"),
+    "user": ("user123", "public"),
+}
+
+
+class LoginRequest(BaseModel):
+    """Login request model."""
+    username: str
+    password: str
+
+
+def generate_jwt_token(username: str, role: str) -> str:
+    """Generate a JWT token with username, role, and expiration."""
+    payload = {
+        "username": username,
+        "role": role,
+        "exp": datetime.utcnow() + timedelta(hours=TOKEN_EXPIRATION_HOURS),
+        "iat": datetime.utcnow(),
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return token
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +79,59 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Login Endpoint ────────────────────────────────────────────────────────────
+
+@app.post("/login")
+async def login(credentials: LoginRequest):
+    """
+    JWT Login Endpoint
+    
+    Demo users:
+      - admin / admin123 → role: admin
+      - user / user123 → role: public
+    
+    Returns:
+      {
+        "token": "eyJ0eXAi...",
+        "username": "user",
+        "role": "public",
+        "expires_in": 43200
+      }
+    """
+    username = credentials.username
+    password = credentials.password
+    
+    # Verify credentials against demo users
+    if username not in DEMO_USERS:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "error": "Invalid credentials",
+                "message": f"User '{username}' not found",
+            },
+        )
+    
+    stored_password, role = DEMO_USERS[username]
+    
+    if password != stored_password:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "error": "Invalid credentials",
+                "message": "Incorrect password",
+            },
+        )
+    
+    # Generate JWT token
+    token = generate_jwt_token(username, role)
+    
+    return {
+        "token": token,
+        "username": username,
+        "role": role,
+        "expires_in": TOKEN_EXPIRATION_HOURS * 3600,  # in seconds
+    }
 
 # ── Target backend URL ────────────────────────────────────────────────────────
 TARGET_GRAPHQL_URL = os.getenv("TARGET_GRAPHQL_URL", "http://localhost:4000/graphql")
@@ -737,7 +821,7 @@ def stats_dashboard():
 async def update_config(request: Request):
     """
     Toggle rules at runtime for live demo.
-    Example: POST /config {"allow_introspection": true, "max_depth": 10}
+    Example: POST /config {"allow_introspection": true, "max_depth": 10, "disable_injection_detection": true}
     """
     body = await request.json()
     changes = []
@@ -762,6 +846,28 @@ async def update_config(request: Request):
         Config.RATE_LIMIT_REQUESTS_PER_MINUTE = int(body["rate_limit"])
         changes.append(f"RATE_LIMIT = {Config.RATE_LIMIT_REQUESTS_PER_MINUTE}/min")
     
+    if "disable_injection_detection" in body:
+        disable = bool(body["disable_injection_detection"])
+        if disable:
+            Config.INJECTION_PATTERNS = []  # Disable all injection detection
+            changes.append("INJECTION_PATTERNS = [] (R05 DISABLED)")
+        else:
+            # Re-enable with default patterns
+            Config.INJECTION_PATTERNS = [
+                r"'\s*OR\s*'?1'?='?1",
+                r"--\s*$",
+                r";\s*DROP\s+TABLE",
+                r"UNION\s+SELECT",
+                r"SLEEP\s*\(",
+                r"pg_sleep\s*\(",
+                r"\$where",
+                r"\$gt\b|\$ne\b|\$regex\b",
+                r"\{\{.*\}\}",
+                r"\$\{.*\}",
+                r"\.\./",
+            ]
+            changes.append("INJECTION_PATTERNS = [default patterns] (R05 ENABLED)")
+    
     print(f"[MIDDLEWARE] Config updated: {changes}")
     return {"updated": changes, "current_config": {
         "allow_introspection": Config.ALLOW_INTROSPECTION,
@@ -769,6 +875,7 @@ async def update_config(request: Request):
         "max_complexity": Config.MAX_QUERY_COMPLEXITY,
         "allow_batching": Config.ALLOW_BATCHING,
         "rate_limit_per_min": Config.RATE_LIMIT_REQUESTS_PER_MINUTE,
+        "injection_detection_enabled": len(Config.INJECTION_PATTERNS) > 0,
     }}
 
 

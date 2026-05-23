@@ -48,6 +48,11 @@ def parse_args():
         help="Target GraphQL endpoint URL (default: http://localhost:4000/graphql)",
     )
     parser.add_argument(
+        "--token",
+        default=None,
+        help="JWT token for authentication (if testing middleware with auth)",
+    )
+    parser.add_argument(
         "--batch-size", "-b",
         type=int,
         default=100,
@@ -73,7 +78,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_probe(target_url: str, batch_size: int, depths: list, skip_dos: bool) -> dict:
+def run_probe(target_url: str, batch_size: int, depths: list, skip_dos: bool, token: str = None) -> dict:
     """Run all probe modules and return consolidated results dict."""
     
     report = {
@@ -92,7 +97,7 @@ def run_probe(target_url: str, batch_size: int, depths: list, skip_dos: bool) ->
     print("─"*60)
     
     try:
-        raw_schema = run_introspection(target_url)
+        raw_schema = run_introspection(target_url, token=token)
     except Exception as e:
         print(f"[ERROR] Cannot reach target: {e}")
         print("Make sure the target API is running!")
@@ -148,7 +153,7 @@ def run_probe(target_url: str, batch_size: int, depths: list, skip_dos: bool) ->
     print("  PHASE 4/4 — INJECTION TESTS")
     print("─"*60)
     
-    injection_findings = run_all_injection_tests(target_url, parsed_schema)
+    injection_findings = run_all_injection_tests(target_url, parsed_schema, token=token)
     print_injection_results(injection_findings)
     report["injection"] = injection_findings
 
@@ -216,6 +221,7 @@ def main():
     print(f"  Target  : {args.target}")
     print(f"  Batch   : {args.batch_size} queries")
     print(f"  Depths  : {args.depths}")
+    print(f"  Auth    : {'JWT Token provided' if args.token else 'No authentication'}")
     print(f"  Output  : {args.output}")
     
     report = run_probe(
@@ -223,6 +229,7 @@ def main():
         batch_size=args.batch_size,
         depths=args.depths,
         skip_dos=args.skip_dos,
+        token=args.token,
     )
     
     print_final_summary(report)
